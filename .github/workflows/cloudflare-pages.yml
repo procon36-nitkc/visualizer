@@ -37,7 +37,7 @@ jobs:
         with:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: pages deploy ./dist --project-name=procon36-visualizer
+          command: pages deploy ./dist --project-name=procon36-nitkc-visualizer
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add publish URL as commit status
