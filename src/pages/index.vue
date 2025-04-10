@@ -1,5 +1,5 @@
 <template>
-  <div class="p-4 space-y-6 max-w-screen-md mx-auto">
+  <div class="p-4 space-y-6 max-w-screen-lg mx-auto">
     <h1 class="text-2xl font-bold text-center">パズルゲーム</h1>
 
     <!-- 🛠 フィールド設定エリア -->
@@ -33,8 +33,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useFieldStore } from '@/stores/field'
-import GameBoard from '@/components/GameBoard.vue'
-import GameControl from '@/components/GameControl.vue'
 import type { ProblemInput } from '@/types'
 
 const fieldStore = useFieldStore()
