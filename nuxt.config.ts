@@ -10,4 +10,14 @@ export default defineNuxtConfig({
       autoSubfolderIndex: false,
     },
   },
+  app: {
+    head: {
+      meta: [
+        {
+          name: "viewport",
+          content: "width=device-width, initial-scale=1, user-scalable=no"
+        }
+      ]
+    }
+  }
 });
