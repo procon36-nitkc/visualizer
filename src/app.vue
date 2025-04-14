@@ -6,3 +6,8 @@
     </UApp>
     </div>
 </template>
+<style scoped>
+* {
+  touch-action: manipulation;
+}
+</style>
