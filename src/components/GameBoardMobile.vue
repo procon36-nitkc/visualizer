@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useFieldStore } from '@/stores/field'
+import type { OperationWithDir } from '@/types'
 
 const fieldStore = useFieldStore()
 const selected = defineModel<{ x: number; y: number }[]>('selected')
@@ -9,6 +10,7 @@ const selected = defineModel<{ x: number; y: number }[]>('selected')
 const scale = ref(1)
 const translateX = ref(0)
 const translateY = ref(0)
+const overlay = ref<{ op: OperationWithDir; angle: number; cells: number[][] } | null>(null)
 
 const touchStartAt = ref(0)
 const touchMode = ref<'select' | 'panzoom'>('select')
@@ -60,6 +62,22 @@ const boardStyle = computed(() => ({
   transformOrigin: '0 0',
   transition: 'transform 0.05s linear',
 }))
+
+const overlayStyle = computed(() => {
+  if (!overlay.value) return {}
+  const cell = document.querySelector('.cell') as HTMLElement | null
+  if (!cell) return {}
+  const size = cell.offsetWidth
+  return {
+    top: `${overlay.value.op.y * size}px`,
+    left: `${overlay.value.op.x * size}px`,
+    width: `${overlay.value.op.n * size}px`,
+    height: `${overlay.value.op.n * size}px`,
+    transform: `rotate(${overlay.value.angle}deg)`,
+    transformOrigin: 'center center',
+    transition: 'transform 300ms ease',
+  }
+})
 
 const getCellFromTouch = (e: TouchEvent): { x: number; y: number } | null => {
   const target = (e.target as HTMLElement)?.closest('.cell')
@@ -124,6 +142,27 @@ const handleTouchEnd = (e: TouchEvent) => {
   moved = false
 }
 
+async function animateRotation(op: OperationWithDir) {
+  const cells = [] as number[][]
+  for (let y = 0; y < op.n; y++) {
+    cells.push(fieldStore.field[op.y + y].slice(op.x, op.x + op.n))
+  }
+  overlay.value = { op, angle: 0, cells }
+  await nextTick()
+  requestAnimationFrame(() => {
+    if (overlay.value) overlay.value.angle = op.clockwise ? 90 : -90
+  })
+  await new Promise((resolve) => setTimeout(resolve, 300))
+  overlay.value = null
+}
+
+onMounted(() => {
+  fieldStore.setAnimator(animateRotation)
+})
+onUnmounted(() => {
+  fieldStore.setAnimator(null)
+})
+
 </script>
 
 <template>
@@ -138,7 +177,7 @@ const handleTouchEnd = (e: TouchEvent) => {
       :style="boardStyle"
     >
       <div
-        class="grid"
+        class="grid relative"
         :style="{ gridTemplateColumns: `repeat(${fieldStore.size}, minmax(2.5rem, 1fr))` }"
       >
         <template v-for="(row, y) in fieldStore.field" :key="y">
@@ -161,6 +200,22 @@ const handleTouchEnd = (e: TouchEvent) => {
 ></div>
           </div>
         </template>
+        <div
+          v-if="overlay"
+          class="absolute z-50 pointer-events-none grid"
+          :style="{ ...overlayStyle, gridTemplateColumns: `repeat(${overlay.op.n}, minmax(2.5rem, 1fr))` }"
+        >
+          <template v-for="(row, y) in overlay.cells" :key="`o-${y}`">
+            <div
+              v-for="(cell, x) in row"
+              :key="`o-${y}-${x}`"
+              class="cell relative aspect-square border border-gray-300 dark:border-neutral-700 text-center flex items-center justify-center font-bold"
+              :style="getCellStyleObject(cell, x, y)"
+            >
+              {{ cell }}
+            </div>
+          </template>
+        </div>
       </div>
     </div>
   </div>

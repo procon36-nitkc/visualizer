@@ -1,12 +1,13 @@
 import { ref, computed } from "vue";
 import { defineStore } from "pinia";
-import type { Operation, Problem } from "@/types";
+import type { Operation, OperationWithDir, Problem } from "@/types";
 import { applyRotation } from "~/utils/rotation";
 
 export const useFieldStore = defineStore("field", () => {
   const size = ref<number>(4);
   const field = ref<number[][]>([]);
-  const history = ref<Operation[]>([]);
+  const history = ref<OperationWithDir[]>([]);
+  const animator = ref<((op: OperationWithDir) => Promise<void>) | null>(null);
 
   const generateField = (): void => {
     const total = size.value * size.value;
@@ -27,15 +28,35 @@ export const useFieldStore = defineStore("field", () => {
     history.value = [];
   };
 
+  const setAnimator = (fn: ((op: OperationWithDir) => Promise<void>) | null) => {
+    animator.value = fn;
+  };
+
+  const applyOperation = async (
+    op: OperationWithDir,
+    animated = false
+  ): Promise<void> => {
+    if (animated && animator.value) {
+      await animator.value(op);
+    }
+    field.value = applyRotation(field.value, op.x, op.y, op.n, op.clockwise);
+    history.value.push({ ...op });
+  };
+
   const rotate = (x: number, y: number, n: number): void => {
-    field.value = applyRotation(field.value, x, y, n, true);
-    history.value.push({ x, y, n });
+    applyOperation({ x, y, n, clockwise: true });
   };
 
   const undo = (): void => {
     const last = history.value.pop();
     if (last) {
-      field.value = applyRotation(field.value, last.x, last.y, last.n, false);
+      field.value = applyRotation(
+        field.value,
+        last.x,
+        last.y,
+        last.n,
+        !last.clockwise
+      );
     }
   };
 
@@ -51,8 +72,8 @@ export const useFieldStore = defineStore("field", () => {
   };
 
   const exportHistoryAsOps = computed(() => {
-    const reduced: Operation[] = [];
-    let buffer: Operation[] = [];
+    const reduced: OperationWithDir[] = [];
+    let buffer: OperationWithDir[] = [];
 
     const flushBuffer = () => {
       if (buffer.length === 0) return;
@@ -89,6 +110,8 @@ export const useFieldStore = defineStore("field", () => {
     field,
     history,
     generateField,
+    setAnimator,
+    applyOperation,
     rotate,
     undo,
     setFieldFromProblem,
