@@ -19,6 +19,8 @@ const completeStatus = ref<boolean | null>(null); // ← 完成状態の保持
 const playing = ref(false);
 const playbackIndex = ref(0);
 let timer: number | null = null;
+let initialField: number[][] = [];
+let initialHistory: Operation[] = [];
 
 const topLeft = computed(() => {
   if (props.selected.length < 2) return { x: 0, y: 0 };
@@ -57,6 +59,8 @@ const handleCheckComplete = () => {
 const playNext = async () => {
   if (playbackIndex.value >= props.operations.length) {
     playing.value = false;
+    fieldStore.field = initialField.map((row) => [...row]);
+    fieldStore.history = [...initialHistory];
     return;
   }
   const op = props.operations[playbackIndex.value];
@@ -67,17 +71,22 @@ const playNext = async () => {
 
 const startPlayback = () => {
   if (playing.value || props.operations.length === 0) return;
+  initialField = fieldStore.field.map((row) => [...row]);
+  initialHistory = [...fieldStore.history];
   playbackIndex.value = 0;
   playing.value = true;
   playNext();
 };
 
 const stopPlayback = () => {
+  if (!playing.value) return;
   playing.value = false;
   if (timer) {
     clearTimeout(timer);
     timer = null;
   }
+  fieldStore.field = initialField.map((row) => [...row]);
+  fieldStore.history = [...initialHistory];
 };
 </script>
 
