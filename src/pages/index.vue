@@ -73,10 +73,31 @@ const operations = ref<Operation[]>([])
 const handleOpsLoad = () => {
   try {
     const parsed = JSON.parse(operationsInput.value)
-    if (Array.isArray(parsed)) {
-      operations.value = parsed as Operation[]
-      alert('操作を読み込みました')
+    if (!Array.isArray(parsed)) throw new Error('not array')
+    const ops: Operation[] = []
+    for (const op of parsed) {
+      if (
+        typeof op.x !== 'number' ||
+        typeof op.y !== 'number' ||
+        typeof op.n !== 'number'
+      ) {
+        alert('操作JSONの形式が正しくありません')
+        return
+      }
+      if (
+        op.x < 0 ||
+        op.y < 0 ||
+        op.n <= 0 ||
+        op.x + op.n > fieldStore.size ||
+        op.y + op.n > fieldStore.size
+      ) {
+        alert('無効な操作が含まれています')
+        return
+      }
+      ops.push({ x: op.x, y: op.y, n: op.n })
     }
+    operations.value = ops
+    alert('操作を読み込みました')
   } catch (e) {
     alert('操作JSONの形式が正しくありません')
   }
