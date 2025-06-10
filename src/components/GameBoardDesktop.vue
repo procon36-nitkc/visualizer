@@ -7,6 +7,7 @@ const selected = defineModel<{ x: number; y: number }[]>('selected')
 const boardRef = ref<HTMLElement | null>(null)
 
 const animStyle = ref<Record<string, string>>({})
+const animRotation = ref(0)
 const animCells = computed(() => {
   const anim = fieldStore.animation
   if (!anim) return []
@@ -31,7 +32,8 @@ watch(() => fieldStore.animation, async (anim) => {
     transformOrigin: 'center center',
   }
   await nextTick()
-  animStyle.value.transform = `rotate(${anim.clockwise ? 90 : -90}deg)`
+  animRotation.value = anim.clockwise ? 90 : -90
+  animStyle.value.transform = `rotate(${animRotation.value}deg)`
 })
 
 const scale = ref(1)
@@ -194,7 +196,11 @@ const cellFontSize = computed(() => {
             v-for="(cell, ix) in row"
             :key="ix"
             class="border border-gray-300 dark:border-neutral-700 flex items-center justify-center font-bold"
-            :style="{ ...getBaseCellStyle(cell), fontSize: cellFontSize }"
+            :style="{
+              ...getBaseCellStyle(cell),
+              fontSize: cellFontSize,
+              transform: `rotate(${-animRotation.value}deg)`
+            }"
           >
             {{ cell }}
           </div>
