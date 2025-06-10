@@ -56,11 +56,28 @@ const handleCheckComplete = () => {
   completeStatus.value = isFieldComplete(fieldStore.field);
 };
 
+const handleUndo = () => {
+  const startLen = initialHistory.length;
+  const hist = fieldStore.history;
+  const ops = props.operations;
+  const match =
+    initialField.length > 0 &&
+    hist.length >= startLen + ops.length &&
+    ops.every((op, idx) => {
+      const h = hist[startLen + idx];
+      return h && h.x === op.x && h.y === op.y && h.n === op.n;
+    });
+  if (match) {
+    fieldStore.field = initialField.map((row) => [...row]);
+    fieldStore.history = [...initialHistory];
+  } else {
+    fieldStore.undo();
+  }
+};
+
 const playNext = async () => {
   if (playbackIndex.value >= props.operations.length) {
     playing.value = false;
-    fieldStore.field = initialField.map((row) => [...row]);
-    fieldStore.history = [...initialHistory];
     return;
   }
   const op = props.operations[playbackIndex.value];
@@ -71,8 +88,13 @@ const playNext = async () => {
 
 const startPlayback = () => {
   if (playing.value || props.operations.length === 0) return;
-  initialField = fieldStore.field.map((row) => [...row]);
-  initialHistory = [...fieldStore.history];
+  if (initialField.length === 0) {
+    initialField = fieldStore.field.map((row) => [...row]);
+    initialHistory = [...fieldStore.history];
+  } else {
+    fieldStore.field = initialField.map((row) => [...row]);
+    fieldStore.history = [...initialHistory];
+  }
   playbackIndex.value = 0;
   playing.value = true;
   playNext();
@@ -104,7 +126,7 @@ const stopPlayback = () => {
         </UButton>
 
         <UButton
-          @click="fieldStore.undo"
+          @click="handleUndo"
           :disabled="fieldStore.history.length === 0"
           icon="i-heroicons-arrow-uturn-left"
         >
