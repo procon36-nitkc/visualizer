@@ -98,6 +98,19 @@ const handleCheckComplete = () => {
         >
           Undo
         </UButton>
+
+        <div class="flex items-center gap-2 ml-2">
+          <label class="text-sm">速度</label>
+          <input
+            type="range"
+            min="100"
+            max="1000"
+            step="50"
+            v-model.number="fieldStore.animationDuration"
+            class="w-32"
+          />
+          <span class="text-sm w-12 text-right">{{ fieldStore.animationDuration }}ms</span>
+        </div>
       </ClientOnly>
 
       <UButton

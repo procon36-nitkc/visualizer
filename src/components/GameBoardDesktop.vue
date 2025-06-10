@@ -19,7 +19,7 @@ watch(() => fieldStore.animation, async (anim) => {
     width: `calc(${n} * 100% / ${fieldStore.size})`,
     height: `calc(${n} * 100% / ${fieldStore.size})`,
     transform: 'rotate(0deg)',
-    transition: 'transform 0.3s',
+    transition: `transform ${fieldStore.animationDuration / 1000}s`,
   }
   await nextTick()
   animStyle.value.transform = `rotate(${anim.clockwise ? 90 : -90}deg)`
@@ -160,7 +160,7 @@ const cellFontSize = computed(() => {
     >
       <div
         v-if="fieldStore.animation"
-        class="absolute grid bg-white/80 pointer-events-none"
+        class="absolute grid bg-white/80 pointer-events-none border-2 border-red-500 z-10"
         :style="animStyle"
       >
         <template v-for="(row, yy) in animCells" :key="yy">
