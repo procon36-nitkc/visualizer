@@ -2,9 +2,11 @@
 import { ref, computed } from "vue";
 import { useFieldStore } from "@/stores/field";
 import { isFieldComplete } from "@/utils/isFieldComplete";
+import type { Operation } from "@/types";
 
 const props = defineProps<{
   selected: { x: number; y: number }[];
+  operations: Operation[];
 }>();
 
 const emit = defineEmits<{
@@ -14,6 +16,7 @@ const emit = defineEmits<{
 const fieldStore = useFieldStore();
 const showExport = ref(false);
 const completeStatus = ref<boolean | null>(null); // ← 完成状態の保持
+const isPlaying = computed(() => fieldStore.isPlaying);
 
 const topLeft = computed(() => {
   if (props.selected.length < 2) return { x: 0, y: 0 };
@@ -45,6 +48,15 @@ const handleRotate = () => {
   fieldStore.rotate(topLeft.value.x, topLeft.value.y, size.value);
 };
 
+const startPlayback = () => {
+  if (props.operations.length === 0) return;
+  fieldStore.startPlayback(props.operations);
+};
+
+const stopPlayback = () => {
+  fieldStore.stopPlayback();
+};
+
 const handleCheckComplete = () => {
   completeStatus.value = isFieldComplete(fieldStore.field);
 };
@@ -61,6 +73,22 @@ const handleCheckComplete = () => {
           icon="i-heroicons-arrow-path"
         >
           導く（90度回転）
+        </UButton>
+
+        <UButton
+          @click="startPlayback"
+          :disabled="isPlaying || props.operations.length === 0"
+          icon="i-heroicons-play"
+          color="primary"
+        >
+          再生
+        </UButton>
+        <UButton
+          @click="stopPlayback"
+          :disabled="!isPlaying"
+          icon="i-heroicons-pause"
+        >
+          停止
         </UButton>
 
         <UButton

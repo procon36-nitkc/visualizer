@@ -20,23 +20,36 @@
         />
         <UButton class="mt-2" @click="handleProblemLoad" color="primary">読み込み</UButton>
       </div>
+
+      <div>
+        <label class="font-semibold">操作JSON読み込み:</label>
+        <UTextarea
+          v-model="opsInput"
+          class="mt-1 w-full font-mono text-sm"
+          placeholder='[{"x":0,"y":0,"n":2}]'
+          :rows="5"
+        />
+        <UButton class="mt-2" @click="handleOpsLoad" color="primary">読み込み</UButton>
+      </div>
     </section>
 
     <!-- 🎮 ゲーム盤面 -->
     <GameBoard v-model:selected="selected" />
 
     <!-- 🎛 操作パネル -->
-    <GameControl v-model:selected="selected" />
+    <GameControl v-model:selected="selected" :operations="operations" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useFieldStore } from '@/stores/field'
-import type { ProblemInput } from '@/types'
+import type { ProblemInput, Operation } from '@/types'
 
 const fieldStore = useFieldStore()
 const selected = ref<{ x: number; y: number }[]>([])
+
+const operations = ref<Operation[]>([])
 
 // 🎲 ランダム生成
 const size = ref(4)
@@ -52,6 +65,17 @@ const handleProblemLoad = () => {
     const parsed: ProblemInput = JSON.parse(problemInput.value)
     fieldStore.setFieldFromProblem(parsed.problem)
     size.value = parsed.problem.field.entities.length
+  } catch (e) {
+    alert('JSONの形式が正しくありません')
+  }
+}
+
+const opsInput = ref('')
+const handleOpsLoad = () => {
+  try {
+    const parsed: Operation[] = JSON.parse(opsInput.value)
+    if (!Array.isArray(parsed)) throw new Error('invalid')
+    operations.value = parsed
   } catch (e) {
     alert('JSONの形式が正しくありません')
   }

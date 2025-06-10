@@ -1,10 +1,29 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useFieldStore } from '@/stores/field'
 
 const fieldStore = useFieldStore()
 const selected = defineModel<{ x: number; y: number }[]>('selected')
 const boardRef = ref<HTMLElement | null>(null)
+
+const animStyle = ref<Record<string, string>>({})
+const animCells = ref<number[][]>([])
+
+watch(() => fieldStore.animation, async (anim) => {
+  if (!anim) return
+  const { x, y, n } = anim.op
+  animCells.value = anim.from.slice(y, y + n).map(row => row.slice(x, x + n))
+  animStyle.value = {
+    top: `calc(${y} * 100% / ${fieldStore.size})`,
+    left: `calc(${x} * 100% / ${fieldStore.size})`,
+    width: `calc(${n} * 100% / ${fieldStore.size})`,
+    height: `calc(${n} * 100% / ${fieldStore.size})`,
+    transform: 'rotate(0deg)',
+    transition: 'transform 0.3s',
+  }
+  await nextTick()
+  animStyle.value.transform = `rotate(${anim.clockwise ? 90 : -90}deg)`
+})
 
 const scale = ref(1)
 
@@ -139,6 +158,21 @@ const cellFontSize = computed(() => {
         transformOrigin: 'center center',
         gridTemplateColumns: `repeat(${fieldStore.size}, minmax(2.5rem, 1fr))` }"
     >
+      <div
+        v-if="fieldStore.animation"
+        class="absolute grid bg-white/80 pointer-events-none"
+        :style="animStyle"
+      >
+        <template v-for="(row, yy) in animCells" :key="yy">
+          <div
+            v-for="(cell, xx) in row"
+            :key="`${yy}-${xx}`"
+            class="border aspect-square flex items-center justify-center"
+          >
+            {{ cell }}
+          </div>
+        </template>
+      </div>
       <template v-for="(row, y) in fieldStore.field" :key="y">
         <div
           v-for="(cell, x) in row"
