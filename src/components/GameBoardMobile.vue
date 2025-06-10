@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useFieldStore } from '@/stores/field'
-import type { OperationWithDir } from '@/types'
+import type { Operation } from '@/types'
 
 const fieldStore = useFieldStore()
 const selected = defineModel<{ x: number; y: number }[]>('selected')
@@ -10,7 +10,7 @@ const selected = defineModel<{ x: number; y: number }[]>('selected')
 const scale = ref(1)
 const translateX = ref(0)
 const translateY = ref(0)
-const overlay = ref<{ op: OperationWithDir; angle: number; cells: number[][] } | null>(null)
+const overlay = ref<{ op: Operation; angle: number; cells: number[][] } | null>(null)
 
 const touchStartAt = ref(0)
 const touchMode = ref<'select' | 'panzoom'>('select')
@@ -142,7 +142,7 @@ const handleTouchEnd = (e: TouchEvent) => {
   moved = false
 }
 
-async function animateRotation(op: OperationWithDir) {
+async function animateRotation(op: Operation) {
   const cells = [] as number[][]
   for (let y = 0; y < op.n; y++) {
     cells.push(fieldStore.field[op.y + y].slice(op.x, op.x + op.n))
@@ -150,7 +150,7 @@ async function animateRotation(op: OperationWithDir) {
   overlay.value = { op, angle: 0, cells }
   await nextTick()
   requestAnimationFrame(() => {
-    if (overlay.value) overlay.value.angle = op.clockwise ? 90 : -90
+    if (overlay.value) overlay.value.angle = 90
   })
   await new Promise((resolve) => setTimeout(resolve, 300))
   overlay.value = null

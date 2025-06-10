@@ -4,9 +4,6 @@ export interface Operation {
   n: number;
 }
 
-export interface OperationWithDir extends Operation {
-  clockwise: boolean;
-}
 
 export interface Problem {
   field: {

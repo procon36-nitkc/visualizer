@@ -26,7 +26,7 @@
         <UTextarea
           v-model="operationsInput"
           class="mt-1 w-full font-mono text-sm"
-          placeholder='[{ "x":0, "y":0, "n":2, "clockwise": true }]' 
+          placeholder='[{ "x":0, "y":0, "n":2 }]'
           :rows="5"
         />
         <UButton class="mt-2" @click="handleOpsLoad" color="primary">操作読み込み</UButton>
@@ -44,7 +44,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useFieldStore } from '@/stores/field'
-import type { ProblemInput, OperationWithDir } from '@/types'
+import type { ProblemInput, Operation } from '@/types'
 
 const fieldStore = useFieldStore()
 const selected = ref<{ x: number; y: number }[]>([])
@@ -69,12 +69,13 @@ const handleProblemLoad = () => {
 }
 
 const operationsInput = ref('')
-const operations = ref<OperationWithDir[]>([])
+const operations = ref<Operation[]>([])
 const handleOpsLoad = () => {
   try {
     const parsed = JSON.parse(operationsInput.value)
     if (Array.isArray(parsed)) {
-      operations.value = parsed as OperationWithDir[]
+      operations.value = parsed as Operation[]
+      alert('操作を読み込みました')
     }
   } catch (e) {
     alert('操作JSONの形式が正しくありません')

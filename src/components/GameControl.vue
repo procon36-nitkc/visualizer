@@ -2,11 +2,11 @@
 import { ref, computed } from "vue";
 import { useFieldStore } from "@/stores/field";
 import { isFieldComplete } from "@/utils/isFieldComplete";
-import type { OperationWithDir } from "@/types";
+import type { Operation } from "@/types";
 
 const props = defineProps<{
   selected: { x: number; y: number }[];
-  operations: OperationWithDir[];
+  operations: Operation[];
 }>();
 
 const emit = defineEmits<{

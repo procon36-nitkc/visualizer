@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useFieldStore } from '@/stores/field'
-import type { OperationWithDir } from '@/types'
+import type { Operation } from '@/types'
 
 const fieldStore = useFieldStore()
 const selected = defineModel<{ x: number; y: number }[]>('selected')
 const boardRef = ref<HTMLElement | null>(null)
 
 const scale = ref(1)
-const overlay = ref<{ op: OperationWithDir; angle: number; cells: number[][] } | null>(null)
+const overlay = ref<{ op: Operation; angle: number; cells: number[][] } | null>(null)
 
 const isDragging = ref(false)
 const dragStart = ref<{ x: number; y: number } | null>(null)
@@ -141,7 +141,7 @@ const overlayStyle = computed(() => {
   }
 })
 
-async function animateRotation(op: OperationWithDir) {
+async function animateRotation(op: Operation) {
   const cells = [] as number[][]
   for (let y = 0; y < op.n; y++) {
     cells.push(fieldStore.field[op.y + y].slice(op.x, op.x + op.n))
@@ -149,7 +149,7 @@ async function animateRotation(op: OperationWithDir) {
   overlay.value = { op, angle: 0, cells }
   await nextTick()
   requestAnimationFrame(() => {
-    if (overlay.value) overlay.value.angle = op.clockwise ? 90 : -90
+    if (overlay.value) overlay.value.angle = 90
   })
   await new Promise((resolve) => setTimeout(resolve, 300))
   overlay.value = null
