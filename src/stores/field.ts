@@ -13,7 +13,7 @@ export const useFieldStore = defineStore("field", () => {
     from: number[][];
   } | null>(null);
 
-  const animationDuration = ref(300); // ms
+  const animationDuration = ref(500); // ms default
   let animTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const isPlaying = ref(false);

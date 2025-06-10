@@ -7,6 +7,16 @@ const selected = defineModel<{ x: number; y: number }[]>('selected')
 const boardRef = ref<HTMLElement | null>(null)
 
 const animStyle = ref<Record<string, string>>({})
+const animCells = computed(() => {
+  const anim = fieldStore.animation
+  if (!anim) return []
+  const { x, y, n } = anim.op
+  const cells: number[][] = []
+  for (let j = 0; j < n; j++) {
+    cells.push(anim.from[y + j].slice(x, x + n))
+  }
+  return cells
+})
 
 watch(() => fieldStore.animation, async (anim) => {
   if (!anim) return
@@ -17,7 +27,8 @@ watch(() => fieldStore.animation, async (anim) => {
     width: `calc(${n} * 100% / ${fieldStore.size})`,
     height: `calc(${n} * 100% / ${fieldStore.size})`,
     transform: 'rotate(0deg)',
-    transition: `transform ${fieldStore.animationDuration / 1000}s`,
+    transition: `transform ${fieldStore.animationDuration / 1000}s ease-in-out`,
+    transformOrigin: 'center center',
   }
   await nextTick()
   animStyle.value.transform = `rotate(${anim.clockwise ? 90 : -90}deg)`
@@ -113,14 +124,22 @@ const isInGarden = (x: number, y: number): boolean => {
   return x >= topX && x < topX + n && y >= topY && y < topY + n
 }
 
-
-const getCellStyleObject = (value: number, x: number, y: number): Record<string, string> => {
+const getBaseCellStyle = (value: number): Record<string, string> => {
   const totalValues = (fieldStore.size * fieldStore.size) / 2
   const hue = (value * 47) % 360
   const saturation = 60 + (value % 20)
   let lightness = 85 - Math.floor((value / totalValues) * 30)
   const textLightness = lightness < 65 ? 95 : 15
 
+  return {
+    backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+    color: `hsl(${hue}, 40%, ${textLightness}%)`,
+  }
+}
+
+
+const getCellStyleObject = (value: number, x: number, y: number): Record<string, string> => {
+  const base = getBaseCellStyle(value)
   const anim = fieldStore.animation
   const inAnim =
     anim &&
@@ -130,13 +149,14 @@ const getCellStyleObject = (value: number, x: number, y: number): Record<string,
     y < anim.op.y + anim.op.n
 
   if (isInGarden(x, y) || inAnim) {
-    lightness -= 30
+    const m = /hsl\((\d+), (\d+)%\, (\d+)%\)/.exec(base.backgroundColor || '')
+    if (m) {
+      const l = Number(m[3]) - 30
+      base.backgroundColor = `hsl(${m[1]}, ${m[2]}%, ${l}%)`
+    }
   }
-
-  return {
-    backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-    color: `hsl(${hue}, 40%, ${textLightness}%)`,
-  }
+  if (inAnim) base.opacity = '0'
+  return base
 }
 
 const cellFontSize = computed(() => {
@@ -166,9 +186,20 @@ const cellFontSize = computed(() => {
     >
       <div
         v-if="fieldStore.animation"
-        class="absolute pointer-events-none border-2 border-red-500 z-10"
-        :style="animStyle"
-      />
+        class="absolute pointer-events-none border-2 border-red-500 z-10 grid"
+        :style="{ ...animStyle, gridTemplateColumns: `repeat(${fieldStore.animation?.op.n ?? 1}, 1fr)` }"
+      >
+        <template v-for="(row, iy) in animCells" :key="iy">
+          <div
+            v-for="(cell, ix) in row"
+            :key="ix"
+            class="border border-gray-300 dark:border-neutral-700 flex items-center justify-center font-bold"
+            :style="{ ...getBaseCellStyle(cell), fontSize: cellFontSize }"
+          >
+            {{ cell }}
+          </div>
+        </template>
+      </div>
       <template v-for="(row, y) in fieldStore.field" :key="y">
         <div
           v-for="(cell, x) in row"
