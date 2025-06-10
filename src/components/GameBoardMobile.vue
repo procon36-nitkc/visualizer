@@ -24,7 +24,6 @@ const tapBuffer = ref<{ x: number; y: number }[]>([])
 const firstTap = computed(() => tapBuffer.value.length === 1 ? tapBuffer.value[0] : null)
 
 const animStyle = ref<Record<string, string>>({})
-const animRotation = ref(0)
 const animCells = computed(() => {
   const anim = fieldStore.animation
   if (!anim) return []
@@ -49,8 +48,7 @@ watch(() => fieldStore.animation, async (anim) => {
     transformOrigin: 'center center',
   }
   await nextTick()
-  animRotation.value = anim.clockwise ? 90 : -90
-  animStyle.value.transform = `rotate(${animRotation.value}deg)`
+  animStyle.value.transform = `rotate(${anim.clockwise ? 90 : -90}deg)`
 })
 
 const isInGarden = (x: number, y: number): boolean => {
@@ -198,12 +196,8 @@ const handleTouchEnd = (e: TouchEvent) => {
             <div
               v-for="(cell, ix) in row"
               :key="ix"
-              class="border border-gray-300 dark:border-neutral-700 flex items-center justify-center font-bold"
-              :style="{
-                ...getBaseCellStyle(cell),
-                fontSize: cellFontSize,
-                transform: `rotate(${-animRotation.value}deg)`
-              }"
+              class="flex items-center justify-center font-bold"
+              :style="{ ...getBaseCellStyle(cell), fontSize: cellFontSize }"
             >
               {{ cell }}
             </div>
