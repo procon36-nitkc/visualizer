@@ -93,7 +93,7 @@ const handleCheckComplete = () => {
 
         <UButton
           @click="fieldStore.undo"
-          :disabled="fieldStore.history.length === 0"
+          :disabled="fieldStore.history.length === 0 || isPlaying"
           icon="i-heroicons-arrow-uturn-left"
         >
           Undo
