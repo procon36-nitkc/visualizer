@@ -24,12 +24,10 @@ const tapBuffer = ref<{ x: number; y: number }[]>([])
 const firstTap = computed(() => tapBuffer.value.length === 1 ? tapBuffer.value[0] : null)
 
 const animStyle = ref<Record<string, string>>({})
-const animCells = ref<number[][]>([])
 
 watch(() => fieldStore.animation, async (anim) => {
   if (!anim) return
   const { x, y, n } = anim.op
-  animCells.value = anim.from.slice(y, y + n).map(row => row.slice(x, x + n))
   animStyle.value = {
     top: `calc(${y} * 100% / ${fieldStore.size})`,
     left: `calc(${x} * 100% / ${fieldStore.size})`,
@@ -162,19 +160,9 @@ const handleTouchEnd = (e: TouchEvent) => {
       >
         <div
           v-if="fieldStore.animation"
-          class="absolute grid bg-white/80 pointer-events-none border-2 border-red-500 z-10"
+          class="absolute pointer-events-none border-2 border-red-500 z-10"
           :style="animStyle"
-        >
-          <template v-for="(row, yy) in animCells" :key="yy">
-            <div
-              v-for="(cell, xx) in row"
-              :key="`${yy}-${xx}`"
-              class="border aspect-square flex items-center justify-center"
-            >
-              {{ cell }}
-            </div>
-          </template>
-        </div>
+        />
         <template v-for="(row, y) in fieldStore.field" :key="y">
           <div
             v-for="(cell, x) in row"
