@@ -98,13 +98,17 @@ export const useFieldStore = defineStore("field", () => {
 
     playbackLength = 0;
     isPlaying.value = true;
-    for (const op of ops) {
-      if (!isPlaying.value) break;
-      await applyOperation(op, true, true);
-      playbackLength++;
-      await new Promise((r) => setTimeout(r, animationDuration.value));
+    try {
+      for (const op of ops) {
+        if (!isPlaying.value) break;
+        await applyOperation(op, true, true);
+        playbackLength++;
+        await new Promise((r) => setTimeout(r, animationDuration.value));
+      }
+    } finally {
+      isPlaying.value = false;
+      clearAnimation();
     }
-    isPlaying.value = false;
   };
 
   const stopPlayback = () => {
