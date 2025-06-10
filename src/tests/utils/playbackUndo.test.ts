@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useFieldStore } from '@/stores/field'
+import { applyRotation } from '@/utils/rotation'
 import type { Operation } from '@/types'
 
 function generateSequentialField(size: number): number[][] {
@@ -45,5 +46,36 @@ describe('playback undo', () => {
     store.undo()
 
     expect(store.field).toEqual(original)
+  })
+
+  it('undoes user operations separately from playback batch', async () => {
+    const store = useFieldStore()
+    store.size = 4
+    store.field = generateSequentialField(store.size)
+    const original = store.field.map(r => [...r])
+
+    const ops: Operation[] = [
+      { x: 0, y: 0, n: 2 },
+      { x: 2, y: 2, n: 2 },
+    ]
+
+    store.animationDuration = 0
+    await store.startPlayback(ops)
+
+    // apply a manual operation after playback
+    store.rotate(0, 0, 2)
+
+    // first undo should remove the manual rotation only
+    store.undo()
+
+    let expected = applyRotation(original, ops[0].x, ops[0].y, ops[0].n, true)
+    expected = applyRotation(expected, ops[1].x, ops[1].y, ops[1].n, true)
+    expect(store.field).toEqual(expected)
+    expect(store.history.length).toBe(ops.length)
+
+    // second undo should remove all playback operations
+    store.undo()
+    expect(store.field).toEqual(original)
+    expect(store.history.length).toBe(0)
   })
 })

@@ -57,6 +57,13 @@ const stopPlayback = () => {
   fieldStore.stopPlayback();
 };
 
+const handleReset = () => {
+  if (window.confirm('リセットしますか？')) {
+    fieldStore.resetField();
+    emit('update:selected', []);
+  }
+};
+
 const handleCheckComplete = () => {
   completeStatus.value = isFieldComplete(fieldStore.field);
 };
@@ -93,6 +100,14 @@ const handleCheckComplete = () => {
 
         <UButton
           @click="fieldStore.undo"
+        <UButton
+          @click="handleReset"
+          :disabled="!fieldStore.canReset"
+          icon="i-heroicons-arrow-path-rounded-square"
+          color="warning"
+        >
+          リセット
+        </UButton>
           :disabled="fieldStore.history.length === 0 || isPlaying"
           icon="i-heroicons-arrow-uturn-left"
         >
