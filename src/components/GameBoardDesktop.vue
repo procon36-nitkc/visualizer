@@ -121,7 +121,15 @@ const getCellStyleObject = (value: number, x: number, y: number): Record<string,
   let lightness = 85 - Math.floor((value / totalValues) * 30)
   const textLightness = lightness < 65 ? 95 : 15
 
-  if (isInGarden(x, y)) {
+  const anim = fieldStore.animation
+  const inAnim =
+    anim &&
+    x >= anim.op.x &&
+    x < anim.op.x + anim.op.n &&
+    y >= anim.op.y &&
+    y < anim.op.y + anim.op.n
+
+  if (isInGarden(x, y) || inAnim) {
     lightness -= 30
   }
 
