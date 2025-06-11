@@ -121,7 +121,9 @@ export const useFieldStore = defineStore("field", () => {
         if (!isPlaying.value) break;
         await applyOperation(op, true, true);
         playbackLength++;
-        await new Promise((r) => setTimeout(r, animationDuration.value));
+        if (!animator.value) {
+          await new Promise((r) => setTimeout(r, animationDuration.value));
+        }
       }
     } finally {
       isPlaying.value = false;
