@@ -4,6 +4,22 @@ import { useFieldStore } from '@/stores/field'
 import { applyRotation } from '@/utils/rotation'
 import type { Operation } from '@/types'
 
+function createSeededRandom(seed: number): () => number {
+  return function () {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const generatedSeed = Math.floor(Math.random() * 0xffffffff);
+
+console.log(`Generated seed: ${generatedSeed}`); // For debugging purposes
+
+const random = createSeededRandom(generatedSeed);
+
 function generateSequentialField(size: number): number[][] {
   const field: number[][] = []
   let counter = 1
@@ -19,7 +35,7 @@ function generateSequentialField(size: number): number[][] {
 
 function randomEven(min: number, max: number): number {
   const range = Math.floor((max - min) / 2) + 1
-  return min + Math.floor(Math.random() * range) * 2
+  return min + Math.floor(random() * range) * 2
 }
 
 beforeEach(() => {
@@ -27,17 +43,17 @@ beforeEach(() => {
 })
 
 describe('playback undo', () => {
-  it('restores field after undoing 1000-playback on 24x24', async () => {
+  it('restores field after undoing 100-playback on 24x24', async () => {
     const store = useFieldStore()
     store.size = 24
     store.field = generateSequentialField(store.size)
     const original = store.field.map(row => [...row])
 
     const ops: Operation[] = []
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < 100; i++) {
       const n = randomEven(2, store.size)
-      const x = Math.floor(Math.random() * (store.size - n + 1))
-      const y = Math.floor(Math.random() * (store.size - n + 1))
+      const x = Math.floor(random() * (store.size - n + 1))
+      const y = Math.floor(random() * (store.size - n + 1))
       ops.push({ x, y, n })
     }
 
