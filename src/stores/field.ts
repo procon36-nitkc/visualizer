@@ -7,6 +7,7 @@ export const useFieldStore = defineStore("field", () => {
   const size = ref<number>(4);
   const field = ref<number[][]>([]);
   const history = ref<Operation[]>([]);
+  const animator = ref<((op: Operation) => Promise<void>) | null>(null);
 
   const generateField = (): void => {
     const total = size.value * size.value;
@@ -27,9 +28,23 @@ export const useFieldStore = defineStore("field", () => {
     history.value = [];
   };
 
+  const setAnimator = (fn: ((op: Operation) => Promise<void>) | null) => {
+    animator.value = fn;
+  };
+
+  const applyOperation = async (
+    op: Operation,
+    animated = false
+  ): Promise<void> => {
+    if (animated && animator.value) {
+      await animator.value(op);
+    }
+    field.value = applyRotation(field.value, op.x, op.y, op.n, true);
+    history.value.push({ ...op });
+  };
+
   const rotate = (x: number, y: number, n: number): void => {
-    field.value = applyRotation(field.value, x, y, n, true);
-    history.value.push({ x, y, n });
+    applyOperation({ x, y, n });
   };
 
   const undo = (): void => {
@@ -89,6 +104,8 @@ export const useFieldStore = defineStore("field", () => {
     field,
     history,
     generateField,
+    setAnimator,
+    applyOperation,
     rotate,
     undo,
     setFieldFromProblem,

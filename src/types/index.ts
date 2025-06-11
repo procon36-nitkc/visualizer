@@ -4,6 +4,7 @@ export interface Operation {
   n: number;
 }
 
+
 export interface Problem {
   field: {
     entities: number[][];

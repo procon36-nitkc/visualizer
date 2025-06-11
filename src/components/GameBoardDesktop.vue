@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useFieldStore } from '@/stores/field'
+import type { Operation } from '@/types'
 
 const fieldStore = useFieldStore()
 const selected = defineModel<{ x: number; y: number }[]>('selected')
 const boardRef = ref<HTMLElement | null>(null)
 
 const scale = ref(1)
+const overlay = ref<{ op: Operation; angle: number; cells: number[][] } | null>(null)
 
 const isDragging = ref(false)
 const dragStart = ref<{ x: number; y: number } | null>(null)
@@ -122,6 +124,43 @@ const cellFontSize = computed(() => {
   if (s <= 20) return '0.875rem'
   return '0.75rem'
 })
+
+const overlayStyle = computed(() => {
+  if (!overlay.value || !boardRef.value) return {}
+  const cell = boardRef.value.querySelector('.cell') as HTMLElement | null
+  if (!cell) return {}
+  const size = cell.offsetWidth
+  return {
+    top: `${overlay.value.op.y * size}px`,
+    left: `${overlay.value.op.x * size}px`,
+    width: `${overlay.value.op.n * size}px`,
+    height: `${overlay.value.op.n * size}px`,
+    transform: `rotate(${overlay.value.angle}deg)`,
+    transformOrigin: 'center center',
+    transition: 'transform 300ms ease',
+  }
+})
+
+async function animateRotation(op: Operation) {
+  const cells = [] as number[][]
+  for (let y = 0; y < op.n; y++) {
+    cells.push(fieldStore.field[op.y + y].slice(op.x, op.x + op.n))
+  }
+  overlay.value = { op, angle: 0, cells }
+  await nextTick()
+  requestAnimationFrame(() => {
+    if (overlay.value) overlay.value.angle = 90
+  })
+  await new Promise((resolve) => setTimeout(resolve, 300))
+  overlay.value = null
+}
+
+onMounted(() => {
+  fieldStore.setAnimator(animateRotation)
+})
+onUnmounted(() => {
+  fieldStore.setAnimator(null)
+})
 </script>
 
 <template>
@@ -158,6 +197,22 @@ const cellFontSize = computed(() => {
           />
         </div>
       </template>
+      <div
+        v-if="overlay"
+        class="absolute z-50 pointer-events-none grid"
+        :style="{ ...overlayStyle, gridTemplateColumns: `repeat(${overlay.op.n}, minmax(2.5rem, 1fr))` }"
+      >
+        <template v-for="(row, y) in overlay.cells" :key="`o-${y}`">
+          <div
+            v-for="(cell, x) in row"
+            :key="`o-${y}-${x}`"
+            class="cell relative aspect-square border border-gray-300 dark:border-neutral-700 text-center flex items-center justify-center font-bold"
+            :style="{ ...getCellStyleObject(cell, x, y), fontSize: cellFontSize }"
+          >
+            {{ cell }}
+          </div>
+        </template>
+      </div>
     </div>
   </div>
   <div class="flex items-center gap-2 mb-2">

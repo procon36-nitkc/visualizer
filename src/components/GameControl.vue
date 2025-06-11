@@ -2,9 +2,11 @@
 import { ref, computed } from "vue";
 import { useFieldStore } from "@/stores/field";
 import { isFieldComplete } from "@/utils/isFieldComplete";
+import type { Operation } from "@/types";
 
 const props = defineProps<{
   selected: { x: number; y: number }[];
+  operations: Operation[];
 }>();
 
 const emit = defineEmits<{
@@ -14,6 +16,11 @@ const emit = defineEmits<{
 const fieldStore = useFieldStore();
 const showExport = ref(false);
 const completeStatus = ref<boolean | null>(null); // ← 完成状態の保持
+const playing = ref(false);
+const playbackIndex = ref(0);
+let timer: number | null = null;
+let initialField: number[][] = [];
+let initialHistory: Operation[] = [];
 
 const topLeft = computed(() => {
   if (props.selected.length < 2) return { x: 0, y: 0 };
@@ -48,6 +55,61 @@ const handleRotate = () => {
 const handleCheckComplete = () => {
   completeStatus.value = isFieldComplete(fieldStore.field);
 };
+
+const handleUndo = () => {
+  const startLen = initialHistory.length;
+  const hist = fieldStore.history;
+  const ops = props.operations;
+  const match =
+    initialField.length > 0 &&
+    hist.length === startLen + ops.length &&
+    ops.every((op, idx) => {
+      const h = hist[startLen + idx];
+      return h && h.x === op.x && h.y === op.y && h.n === op.n;
+    });
+  if (match) {
+    fieldStore.field = initialField.map((row) => [...row]);
+    fieldStore.history = [...initialHistory];
+  } else {
+    fieldStore.undo();
+  }
+};
+
+const playNext = async () => {
+  if (playbackIndex.value >= props.operations.length) {
+    playing.value = false;
+    return;
+  }
+  const op = props.operations[playbackIndex.value];
+  await fieldStore.applyOperation(op, true);
+  playbackIndex.value++;
+  timer = window.setTimeout(playNext, 500);
+};
+
+const startPlayback = () => {
+  if (playing.value || props.operations.length === 0) return;
+  if (initialField.length === 0) {
+    initialField = fieldStore.field.map((row) => [...row]);
+    initialHistory = [...fieldStore.history];
+  } else {
+    fieldStore.field = initialField.map((row) => [...row]);
+    fieldStore.history = [...initialHistory];
+  }
+  playbackIndex.value = 0;
+  playing.value = true;
+  playNext();
+};
+
+const stopPlayback = () => {
+  if (!playing.value) return;
+  playing.value = false;
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
+  fieldStore.field = initialField.map((row) => [...row]);
+  fieldStore.history = [...initialHistory];
+};
 </script>
 
 <template>
@@ -64,11 +126,26 @@ const handleCheckComplete = () => {
         </UButton>
 
         <UButton
-          @click="fieldStore.undo"
+          @click="handleUndo"
           :disabled="fieldStore.history.length === 0"
           icon="i-heroicons-arrow-uturn-left"
         >
           Undo
+        </UButton>
+
+        <UButton
+          @click="startPlayback"
+          :disabled="playing || props.operations.length === 0"
+          icon="i-heroicons-play"
+        >
+          再生
+        </UButton>
+        <UButton
+          @click="stopPlayback"
+          :disabled="!playing"
+          icon="i-heroicons-pause"
+        >
+          停止
         </UButton>
       </ClientOnly>
 
