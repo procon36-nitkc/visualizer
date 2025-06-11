@@ -100,6 +100,11 @@ const handleCheckComplete = () => {
 
         <UButton
           @click="fieldStore.undo"
+          :disabled="fieldStore.history.length === 0 || isPlaying"
+          icon="i-heroicons-arrow-uturn-left"
+        >
+          Undo
+        </UButton>
         <UButton
           @click="handleReset"
           :disabled="!fieldStore.canReset"
@@ -107,11 +112,6 @@ const handleCheckComplete = () => {
           color="warning"
         >
           リセット
-        </UButton>
-          :disabled="fieldStore.history.length === 0 || isPlaying"
-          icon="i-heroicons-arrow-uturn-left"
-        >
-          Undo
         </UButton>
 
         <div class="flex items-center gap-2 ml-2">
