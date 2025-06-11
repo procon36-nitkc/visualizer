@@ -116,13 +116,6 @@ const getBaseCellStyle = (value: number): Record<string, string> => {
 
 const getCellStyleObject = (value: number, x: number, y: number): Record<string, string> => {
   const base = getBaseCellStyle(value)
-  const anim = overlay.value
-  const inAnim =
-    anim &&
-    x >= anim.op.x &&
-    x < anim.op.x + anim.op.n &&
-    y >= anim.op.y &&
-    y < anim.op.y + anim.op.n
 
   if (isInGarden(x, y)) {
     const m = /hsl\((\d+), (\d+)%\, (\d+)%\)/.exec(base.backgroundColor || '')
@@ -218,7 +211,6 @@ onUnmounted(() => {
             class="cell relative aspect-square border border-gray-300 dark:border-neutral-700 text-center flex items-center justify-center font-bold"
             :style="{ ...getBaseCellStyle(cell), fontSize: cellFontSize }"
           >
-            <!-- {{ cell }} -->
           </div>
         </template>
       </div>
