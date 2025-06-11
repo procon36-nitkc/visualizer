@@ -7,8 +7,9 @@ const fieldStore = useFieldStore()
 const selected = defineModel<{ x: number; y: number }[]>('selected')
 const boardRef = ref<HTMLElement | null>(null)
 
-const overlay = ref<{ op: Operation; angle: number; cells: number[][] } | null>(null)
+const overlay = ref<{ op: Operation; angle: number; cells: number[][]; opacity: number } | null>(null)
 
+const OPACITY_TRANSITION_DURATION = 200 // ms
 const scale = ref(1)
 
 const isDragging = ref(false)
@@ -123,7 +124,7 @@ const getCellStyleObject = (value: number, x: number, y: number): Record<string,
     y >= anim.op.y &&
     y < anim.op.y + anim.op.n
 
-  if (isInGarden(x, y) || inAnim) {
+  if (isInGarden(x, y)) {
     const m = /hsl\((\d+), (\d+)%\, (\d+)%\)/.exec(base.backgroundColor || '')
     if (m) {
       const l = Number(m[3]) - 30
@@ -154,7 +155,8 @@ const overlayStyle = computed(() => {
     height: `${overlay.value.op.n * size}px`,
     transform: `rotate(${overlay.value.angle}deg)`,
     transformOrigin: 'center center',
-    transition: `transform ${fieldStore.animationDuration}ms ease-in-out`,
+    opacity: `${overlay.value.opacity}`,
+    transition: `transform ${fieldStore.animationDuration}ms ease-in-out, opacity ${OPACITY_TRANSITION_DURATION}ms ease-in-out`,
   }
 })
 
@@ -163,13 +165,20 @@ async function animateRotation(op: Operation, apply: () => void) {
   for (let y = 0; y < op.n; y++) {
     cells.push(fieldStore.field[op.y + y].slice(op.x, op.x + op.n))
   }
-  overlay.value = { op, angle: 0, cells }
+  overlay.value = { op, angle: 0, cells, opacity: 1 }
   await nextTick()
   requestAnimationFrame(() => {
-    if (overlay.value) overlay.value.angle = 90
+    if (overlay.value) {
+      overlay.value.angle = 90
+    }
   })
-  await new Promise((resolve) => setTimeout(resolve, fieldStore.animationDuration))
+  await new Promise((resolve) => setTimeout(resolve, fieldStore.animationDuration)).then(() => {
+    if (overlay.value) {
+      overlay.value.opacity = 0
+    }
+  })
   apply()
+  await new Promise((resolve) => setTimeout(resolve, OPACITY_TRANSITION_DURATION)) // opacity transition time
   await nextTick()
   overlay.value = null
 }
@@ -209,7 +218,7 @@ onUnmounted(() => {
             class="cell relative aspect-square border border-gray-300 dark:border-neutral-700 text-center flex items-center justify-center font-bold"
             :style="{ ...getBaseCellStyle(cell), fontSize: cellFontSize }"
           >
-            {{ cell }}
+            <!-- {{ cell }} -->
           </div>
         </template>
       </div>
