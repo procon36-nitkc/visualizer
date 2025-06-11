@@ -7,7 +7,7 @@ const fieldStore = useFieldStore()
 const selected = defineModel<{ x: number; y: number }[]>('selected')
 const boardRef = ref<HTMLElement | null>(null)
 
-const overlay = ref<{ op: Operation; angle: number; cells: number[][] } | null>(null)
+const overlay = ref<{ op: Operation; angle: number } | null>(null)
 
 const scale = ref(1)
 
@@ -155,21 +155,19 @@ const overlayStyle = computed(() => {
     height: `${overlay.value.op.n * size}px`,
     transform: `rotate(${overlay.value.angle}deg)`,
     transformOrigin: 'center center',
-    transition: 'transform 300ms ease',
+    transition: `transform ${fieldStore.animationDuration}ms ease-in-out`,
   }
 })
 
-async function animateRotation(op: Operation) {
-  const cells: number[][] = []
-  for (let y = 0; y < op.n; y++) {
-    cells.push(fieldStore.field[op.y + y].slice(op.x, op.x + op.n))
-  }
-  overlay.value = { op, angle: 0, cells }
+async function animateRotation(op: Operation, apply: () => void) {
+  overlay.value = { op, angle: 0 }
   await nextTick()
   requestAnimationFrame(() => {
     if (overlay.value) overlay.value.angle = 90
   })
-  await new Promise((resolve) => setTimeout(resolve, 300))
+  await new Promise((resolve) => setTimeout(resolve, fieldStore.animationDuration))
+  apply()
+  await nextTick()
   overlay.value = null
 }
 
@@ -198,20 +196,9 @@ onUnmounted(() => {
     >
       <div
         v-if="overlay"
-        class="absolute z-50 pointer-events-none grid"
-        :style="{ ...overlayStyle, gridTemplateColumns: `repeat(${overlay.op.n}, minmax(2.5rem, 1fr))` }"
-      >
-        <template v-for="(row, y) in overlay.cells" :key="`o-${y}`">
-          <div
-            v-for="(cell, x) in row"
-            :key="`o-${y}-${x}`"
-            class="cell relative aspect-square border border-gray-300 dark:border-neutral-700 text-center flex items-center justify-center font-bold"
-            :style="{ ...getBaseCellStyle(cell), fontSize: cellFontSize }"
-          >
-            {{ cell }}
-          </div>
-        </template>
-      </div>
+        class="absolute z-50 pointer-events-none border-2 border-red-500"
+        :style="overlayStyle"
+      />
       <template v-for="(row, y) in fieldStore.field" :key="y">
         <div
           v-for="(cell, x) in row"

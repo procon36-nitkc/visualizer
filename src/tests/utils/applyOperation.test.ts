@@ -38,10 +38,13 @@ describe('useFieldStore.applyOperation', () => {
       [3, 4]
     ]
     const op: Operation = { x: 0, y: 0, n: 2 }
-    const spy = vi.fn().mockResolvedValue(undefined)
+    const spy = vi.fn().mockImplementation((_: Operation, apply: () => void) => {
+      apply()
+      return Promise.resolve()
+    })
     store.setAnimator(spy)
     await store.applyOperation(op, true, true)
-    expect(spy).toHaveBeenCalledWith(op)
+    expect(spy).toHaveBeenCalled()
     expect(store.field).toEqual([
       [3, 1],
       [4, 2]

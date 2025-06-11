@@ -8,7 +8,7 @@ export const useFieldStore = defineStore("field", () => {
   const field = ref<number[][]>([]);
   const history = ref<Operation[]>([]);
   const originalField = ref<number[][] | null>(null);
-  const animator = ref<((op: Operation) => Promise<void>) | null>(null);
+  const animator = ref<((op: Operation, apply: () => void) => Promise<void>) | null>(null);
   const animation = ref<{
     op: Operation;
     clockwise: boolean;
@@ -31,7 +31,7 @@ export const useFieldStore = defineStore("field", () => {
     animation.value = null;
   };
 
-  const setAnimator = (fn: ((op: Operation) => Promise<void>) | null) => {
+  const setAnimator = (fn: ((op: Operation, apply: () => void) => Promise<void>) | null) => {
     animator.value = fn;
   };
 
@@ -63,9 +63,10 @@ export const useFieldStore = defineStore("field", () => {
   ): Promise<void> => {
     clearAnimation();
     if (animated && animator.value) {
-      await animator.value(op);
-      field.value = applyRotation(field.value, op.x, op.y, op.n, clockwise);
-      if (recordHistory) history.value.push({ ...op });
+      await animator.value(op, () => {
+        field.value = applyRotation(field.value, op.x, op.y, op.n, clockwise);
+        if (recordHistory) history.value.push({ ...op });
+      });
       return;
     }
 
