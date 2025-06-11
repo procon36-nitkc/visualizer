@@ -1,28 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useFieldStore } from '@/stores/field'
+import type { Operation } from '@/types'
 
 const fieldStore = useFieldStore()
 const selected = defineModel<{ x: number; y: number }[]>('selected')
 const boardRef = ref<HTMLElement | null>(null)
 
-const animStyle = ref<Record<string, string>>({})
-
-watch(() => fieldStore.animation, async (anim) => {
-  if (!anim) return
-  const { x, y, n } = anim.op
-  animStyle.value = {
-    top: `calc(${y} * 100% / ${fieldStore.size})`,
-    left: `calc(${x} * 100% / ${fieldStore.size})`,
-    width: `calc(${n} * 100% / ${fieldStore.size})`,
-    height: `calc(${n} * 100% / ${fieldStore.size})`,
-    transform: 'rotate(0deg)',
-    transition: `transform ${fieldStore.animationDuration / 1000}s ease-in-out`,
-    transformOrigin: 'center center',
-  }
-  await nextTick()
-  animStyle.value.transform = `rotate(${anim.clockwise ? 90 : -90}deg)`
-})
+const overlay = ref<{ op: Operation; angle: number; cells: number[][] } | null>(null)
 
 const scale = ref(1)
 
@@ -130,7 +115,7 @@ const getBaseCellStyle = (value: number): Record<string, string> => {
 
 const getCellStyleObject = (value: number, x: number, y: number): Record<string, string> => {
   const base = getBaseCellStyle(value)
-  const anim = fieldStore.animation
+  const anim = overlay.value
   const inAnim =
     anim &&
     x >= anim.op.x &&
@@ -157,6 +142,43 @@ const cellFontSize = computed(() => {
   if (s <= 20) return '0.875rem'
   return '0.75rem'
 })
+
+const overlayStyle = computed(() => {
+  if (!overlay.value || !boardRef.value) return {}
+  const cellEl = boardRef.value.querySelector('.cell') as HTMLElement | null
+  if (!cellEl) return {}
+  const size = cellEl.offsetWidth
+  return {
+    top: `${overlay.value.op.y * size}px`,
+    left: `${overlay.value.op.x * size}px`,
+    width: `${overlay.value.op.n * size}px`,
+    height: `${overlay.value.op.n * size}px`,
+    transform: `rotate(${overlay.value.angle}deg)`,
+    transformOrigin: 'center center',
+    transition: 'transform 300ms ease',
+  }
+})
+
+async function animateRotation(op: Operation) {
+  const cells: number[][] = []
+  for (let y = 0; y < op.n; y++) {
+    cells.push(fieldStore.field[op.y + y].slice(op.x, op.x + op.n))
+  }
+  overlay.value = { op, angle: 0, cells }
+  await nextTick()
+  requestAnimationFrame(() => {
+    if (overlay.value) overlay.value.angle = 90
+  })
+  await new Promise((resolve) => setTimeout(resolve, 300))
+  overlay.value = null
+}
+
+onMounted(() => {
+  fieldStore.setAnimator(animateRotation)
+})
+onUnmounted(() => {
+  fieldStore.setAnimator(null)
+})
 </script>
 
 <template>
@@ -175,10 +197,21 @@ const cellFontSize = computed(() => {
         gridTemplateColumns: `repeat(${fieldStore.size}, minmax(2.5rem, 1fr))` }"
     >
       <div
-        v-if="fieldStore.animation"
-        class="absolute pointer-events-none border-2 border-red-500 z-10"
-        :style="animStyle"
-      />
+        v-if="overlay"
+        class="absolute z-50 pointer-events-none grid"
+        :style="{ ...overlayStyle, gridTemplateColumns: `repeat(${overlay.op.n}, minmax(2.5rem, 1fr))` }"
+      >
+        <template v-for="(row, y) in overlay.cells" :key="`o-${y}`">
+          <div
+            v-for="(cell, x) in row"
+            :key="`o-${y}-${x}`"
+            class="cell relative aspect-square border border-gray-300 dark:border-neutral-700 text-center flex items-center justify-center font-bold"
+            :style="{ ...getBaseCellStyle(cell), fontSize: cellFontSize }"
+          >
+            {{ cell }}
+          </div>
+        </template>
+      </div>
       <template v-for="(row, y) in fieldStore.field" :key="y">
         <div
           v-for="(cell, x) in row"
