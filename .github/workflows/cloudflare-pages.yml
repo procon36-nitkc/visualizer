@@ -2,9 +2,6 @@ name: Cloudflare Pages
 
 on:
   push:
-    branches:
-      - main
-      - master
 
 jobs:
   publish:
