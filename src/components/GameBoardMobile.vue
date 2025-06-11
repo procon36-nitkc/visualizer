@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// TODO: GameBoardMobile.vueとGameBoardDesktop.vueの共通部分を抽出して、1つのコンポーネントにまとめる
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useFieldStore } from '@/stores/field'
 import type { Operation } from '@/types'
@@ -24,7 +25,9 @@ const tapBuffer = ref<{ x: number; y: number }[]>([])
 
 const firstTap = computed(() => tapBuffer.value.length === 1 ? tapBuffer.value[0] : null)
 
-const overlay = ref<{ op: Operation; angle: number; cells: number[][] } | null>(null)
+const overlay = ref<{ op: Operation; angle: number; cells: number[][]; opacity: number } | null>(null)
+
+const OPACITY_TRANSITION_DURATION = 200 // ms
 
 const isInGarden = (x: number, y: number): boolean => {
   if (selected.value.length < 2) return false
@@ -49,14 +52,7 @@ const getBaseCellStyle = (value: number): Record<string, string> => {
 
 const getCellStyleObject = (value: number, x: number, y: number): Record<string, string> => {
   const base = getBaseCellStyle(value)
-  const anim = overlay.value
-  const inAnim =
-    anim &&
-    x >= anim.op.x &&
-    x < anim.op.x + anim.op.n &&
-    y >= anim.op.y &&
-    y < anim.op.y + anim.op.n
-  if (isInGarden(x, y) || inAnim) {
+  if (isInGarden(x, y)) {
     const m = /hsl\((\d+), (\d+)%\, (\d+)%\)/.exec(base.backgroundColor || '')
     if (m) {
       const l = Number(m[3]) - 10
@@ -87,7 +83,8 @@ const overlayStyle = computed(() => {
     height: `${overlay.value.op.n * size}px`,
     transform: `rotate(${overlay.value.angle}deg)`,
     transformOrigin: 'center center',
-    transition: `transform ${fieldStore.animationDuration}ms ease-in-out`,
+    opacity: `${overlay.value.opacity}`,
+    transition: `transform ${fieldStore.animationDuration}ms ease-in-out, opacity ${OPACITY_TRANSITION_DURATION}ms ease-in-out`,
   }
 })
 
@@ -212,7 +209,6 @@ const handleTouchEnd = (e: TouchEvent) => {
               class="cell relative aspect-square border border-gray-300 dark:border-neutral-700 text-center flex items-center justify-center font-bold"
               :style="{ ...getBaseCellStyle(cell), fontSize: cellFontSize }"
             >
-              {{ cell }}
             </div>
           </template>
         </div>
