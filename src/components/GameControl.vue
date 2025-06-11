@@ -2,9 +2,11 @@
 import { ref, computed } from "vue";
 import { useFieldStore } from "@/stores/field";
 import { isFieldComplete } from "@/utils/isFieldComplete";
+import type { Operation } from "@/types";
 
 const props = defineProps<{
   selected: { x: number; y: number }[];
+  operations: Operation[];
 }>();
 
 const emit = defineEmits<{
@@ -14,6 +16,7 @@ const emit = defineEmits<{
 const fieldStore = useFieldStore();
 const showExport = ref(false);
 const completeStatus = ref<boolean | null>(null); // ← 完成状態の保持
+const isPlaying = computed(() => fieldStore.isPlaying);
 
 const topLeft = computed(() => {
   if (props.selected.length < 2) return { x: 0, y: 0 };
@@ -45,6 +48,22 @@ const handleRotate = () => {
   fieldStore.rotate(topLeft.value.x, topLeft.value.y, size.value);
 };
 
+const startPlayback = () => {
+  if (props.operations.length === 0) return;
+  fieldStore.startPlayback(props.operations);
+};
+
+const stopPlayback = () => {
+  fieldStore.stopPlayback();
+};
+
+const handleReset = () => {
+  if (window.confirm('リセットしますか？')) {
+    fieldStore.resetField();
+    emit('update:selected', []);
+  }
+};
+
 const handleCheckComplete = () => {
   completeStatus.value = isFieldComplete(fieldStore.field);
 };
@@ -64,12 +83,49 @@ const handleCheckComplete = () => {
         </UButton>
 
         <UButton
+          @click="startPlayback"
+          :disabled="isPlaying || props.operations.length === 0"
+          icon="i-heroicons-play"
+          color="primary"
+        >
+          再生
+        </UButton>
+        <UButton
+          @click="stopPlayback"
+          :disabled="!isPlaying"
+          icon="i-heroicons-pause"
+        >
+          停止
+        </UButton>
+
+        <UButton
           @click="fieldStore.undo"
-          :disabled="fieldStore.history.length === 0"
+          :disabled="fieldStore.history.length === 0 || isPlaying"
           icon="i-heroicons-arrow-uturn-left"
         >
           Undo
         </UButton>
+        <UButton
+          @click="handleReset"
+          :disabled="!fieldStore.canReset"
+          icon="i-heroicons-arrow-path-rounded-square"
+          color="warning"
+        >
+          リセット
+        </UButton>
+
+        <div class="flex items-center gap-2 ml-2">
+          <label class="text-sm">速度</label>
+          <input
+            type="range"
+            min="100"
+            max="1000"
+            step="50"
+            v-model.number="fieldStore.animationDuration"
+            class="w-32"
+          />
+          <span class="text-sm w-12 text-right">{{ fieldStore.animationDuration }}ms</span>
+        </div>
       </ClientOnly>
 
       <UButton

@@ -20,23 +20,49 @@
         />
         <UButton class="mt-2" @click="handleProblemLoad" color="primary">読み込み</UButton>
       </div>
+
+      <div>
+        <label class="font-semibold">操作JSON読み込み:</label>
+        <UTextarea
+          v-model="opsInput"
+          class="mt-1 w-full font-mono text-sm"
+          placeholder='[{"x":0,"y":0,"n":2}]'
+          :rows="5"
+        />
+        <UButton class="mt-2" @click="handleOpsLoad" color="primary">読み込み</UButton>
+        <div v-if="opsLoadStatus !== null" class="mt-1 text-sm">
+          <span
+            v-if="opsLoadStatus"
+            class="text-green-600 dark:text-green-400 font-semibold"
+            >✔ 読み込みに成功しました</span
+          >
+          <span
+            v-else
+            class="text-red-600 dark:text-red-400 font-semibold"
+            >❌ 読み込みに失敗しました</span
+          >
+        </div>
+      </div>
     </section>
 
     <!-- 🎮 ゲーム盤面 -->
     <GameBoard v-model:selected="selected" />
 
     <!-- 🎛 操作パネル -->
-    <GameControl v-model:selected="selected" />
+    <GameControl v-model:selected="selected" :operations="operations" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useFieldStore } from '@/stores/field'
-import type { ProblemInput } from '@/types'
+import type { ProblemInput, Operation } from '@/types'
 
 const fieldStore = useFieldStore()
 const selected = ref<{ x: number; y: number }[]>([])
+
+const operations = ref<Operation[]>([])
+const opsLoadStatus = ref<boolean | null>(null)
 
 // 🎲 ランダム生成
 const size = ref(4)
@@ -54,6 +80,30 @@ const handleProblemLoad = () => {
     size.value = parsed.problem.field.entities.length
   } catch (e) {
     alert('JSONの形式が正しくありません')
+  }
+}
+
+const opsInput = ref('')
+const handleOpsLoad = () => {
+  try {
+    const parsed: Operation[] = JSON.parse(opsInput.value)
+    if (!Array.isArray(parsed)) throw new Error('invalid')
+    const ok = parsed.every(op =>
+      typeof op.x === 'number' &&
+      typeof op.y === 'number' &&
+      typeof op.n === 'number' &&
+      op.n > 0 &&
+      op.n % 2 === 0 &&
+      op.x >= 0 &&
+      op.y >= 0 &&
+      op.x + op.n <= fieldStore.size &&
+      op.y + op.n <= fieldStore.size
+    )
+    if (!ok) throw new Error('invalid-range')
+    operations.value = parsed
+    opsLoadStatus.value = true
+  } catch (e) {
+    opsLoadStatus.value = false
   }
 }
 </script>
