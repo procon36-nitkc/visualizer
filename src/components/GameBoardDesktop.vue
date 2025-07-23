@@ -9,7 +9,7 @@ const boardRef = ref<HTMLElement | null>(null)
 
 const overlay = ref<{ op: Operation; angle: number; cells: number[][]; opacity: number } | null>(null)
 
-const OPACITY_TRANSITION_DURATION = 200 // ms
+const OPACITY_TRANSITION_DURATION = 100 // ms
 const scale = ref(1)
 
 const isDragging = ref(false)
