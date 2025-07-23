@@ -118,9 +118,9 @@ const handleCheckComplete = () => {
           <label class="text-sm">速度</label>
           <input
             type="range"
-            min="100"
+            min="10"
             max="1000"
-            step="50"
+            step="10"
             v-model.number="fieldStore.animationDuration"
             class="w-32"
           />
