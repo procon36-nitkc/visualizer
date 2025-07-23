@@ -26,7 +26,7 @@
         <UTextarea
           v-model="opsInput"
           class="mt-1 w-full font-mono text-sm"
-          placeholder='[{"x":0,"y":0,"n":2}]'
+          placeholder='{"ops": [{"x":0,"y":0,"n":2},{"x":0,"y":0,"n":2}]}'
           :rows="5"
         />
         <UButton class="mt-2" @click="handleOpsLoad" color="primary">読み込み</UButton>
@@ -49,19 +49,19 @@
     <GameBoard v-model:selected="selected" />
 
     <!-- 🎛 操作パネル -->
-    <GameControl v-model:selected="selected" :operations="operations" />
+    <GameControl v-model:selected="selected" :operations="operations.ops" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useFieldStore } from '@/stores/field'
-import type { ProblemInput, Operation } from '@/types'
+import type { ProblemInput, OperationInput } from '@/types'
 
 const fieldStore = useFieldStore()
 const selected = ref<{ x: number; y: number }[]>([])
 
-const operations = ref<Operation[]>([])
+const operations = ref<OperationInput>({ops:[]})
 const opsLoadStatus = ref<boolean | null>(null)
 
 // 🎲 ランダム生成
@@ -86,9 +86,9 @@ const handleProblemLoad = () => {
 const opsInput = ref('')
 const handleOpsLoad = () => {
   try {
-    const parsed: Operation[] = JSON.parse(opsInput.value)
-    if (!Array.isArray(parsed)) throw new Error('invalid')
-    const ok = parsed.every(op =>
+    const parsed: OperationInput = JSON.parse(opsInput.value)
+    if (!Array.isArray(parsed.ops)) throw new Error('invalid')
+    const ok = parsed.ops.every(op =>
       typeof op.x === 'number' &&
       typeof op.y === 'number' &&
       typeof op.n === 'number' &&
