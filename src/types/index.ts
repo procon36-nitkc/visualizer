@@ -1,3 +1,6 @@
+export interface OperationInput {
+  ops: Operation[];
+}
 export interface Operation {
   x: number;
   y: number;
