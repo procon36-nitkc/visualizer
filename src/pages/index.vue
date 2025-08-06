@@ -93,7 +93,6 @@ const handleOpsLoad = () => {
       typeof op.y === 'number' &&
       typeof op.n === 'number' &&
       op.n > 0 &&
-      op.n % 2 === 0 &&
       op.x >= 0 &&
       op.y >= 0 &&
       op.x + op.n <= fieldStore.size &&
