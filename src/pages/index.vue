@@ -68,6 +68,18 @@ AN,1 AN,2 ... AN,N"
               >読み込み</UButton
               >
             </div>
+            <div>
+                <label class="font-semibold">操作競技用文字列読み込み:</label>
+                <UTextarea
+                  v-model="opsKyoproInput"
+                  class="mt-1 w-full font-mono text-sm"
+                  placeholder='{"ops": [{"x":0,"y":0,"n":2},{"x":0,"y":0,"n":2}]}'
+                  :rows="5"
+                />
+                <UButton class="mt-2" @click="handleKyoproOpsLoad" color="primary"
+                  >読み込み</UButton
+                >
+              </div>
           </template>
         </UTabs>
       </div>
@@ -100,6 +112,7 @@ import {
   type ProblemInput,
   type OperationInput,
   isProblem as isProblemInput,
+  isOperationInput,
 } from "@/types";
 import type { TabsItem } from "@nuxt/ui";
 
@@ -140,7 +153,7 @@ const handleProblemLoad = () => {
   }
 };
 
-// 競プロ形式の操作文字列読み込み
+// 競プロ形式の問題文字列読み込み
 const kyoproProblemInput = ref("");
 const handleKyoproProblemLoad = () => {
   try {
@@ -159,6 +172,7 @@ const handleKyoproProblemLoad = () => {
   }
 };
 
+// 操作JSON読み込み
 const opsInput = ref("");
 const handleOpsLoad = () => {
   try {
@@ -184,5 +198,36 @@ const handleOpsLoad = () => {
   }
 };
 
+const handleKyoproOpsLoad = () => {
+  try {
+    const parsed: OperationInput = convertKyoproOpsToOps(
+      opsKyoproInput.value
+    );
+    console.log(parsed);
+    if (!isOperationInput(parsed)) {
+      throw new Error("Invalid operation format");
+    }
+    const ok = parsed.ops.every(
+      (op) =>
+        typeof op.x === "number" &&
+        typeof op.y === "number" &&
+        typeof op.n === "number" &&
+        op.n > 0 &&
+        op.n % 2 === 0 &&
+        op.x >= 0 &&
+        op.y >= 0 &&
+        op.x + op.n <= fieldStore.size &&
+        op.y + op.n <= fieldStore.size
+    );
+    if (!ok) throw new Error("invalid-range");
+    operations.value = parsed;
+    opsInput.value = JSON.stringify(parsed, null, 2);
+    size.value = parsed.ops.length;
+    opsLoadStatus.value = true;
+  } catch (e) {
+    console.error(e);
+    opsLoadStatus.value = false;
+  }
+};
 const opsKyoproInput = ref("");
 </script>

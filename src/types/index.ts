@@ -7,6 +7,32 @@ export interface Operation {
   n: number;
 }
 
+export const isOperation = (operation: any): operation is Operation => {
+  return (
+    operation !== null &&
+    operation !== undefined &&
+    typeof operation === "object" &&
+    typeof operation.x === "number" &&
+    typeof operation.y === "number" &&
+    typeof operation.n === "number" &&
+    Number.isInteger(operation.x) &&
+    Number.isInteger(operation.y) &&
+    Number.isInteger(operation.n)
+  );
+};
+
+export const isOperationInput = (
+  operationInput: any
+): operationInput is OperationInput => {
+  return (
+    operationInput !== null &&
+    operationInput !== undefined &&
+    typeof operationInput === "object" &&
+    Array.isArray(operationInput.ops) &&
+    operationInput.ops.every((op: any) => isOperation(op))
+  );
+};
+
 export interface Problem {
   field: {
     size: number;
