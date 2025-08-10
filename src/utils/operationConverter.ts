@@ -28,7 +28,11 @@ export function convertKyoproOpsToOps(kyoproOps: string): OperationInput {
   }
 
   if (lines.length !== count + 1) {
-    throw new Error(`Expected ${count + 1} lines (1 header + ${count} operations), but got ${lines.length}`);
+    throw new Error(
+      `Expected ${count + 1} lines (1 header + ${count} operations), but got ${
+        lines.length
+      }`
+    );
   }
 
   const operations: Operation[] = [];

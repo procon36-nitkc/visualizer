@@ -426,7 +426,9 @@ describe("round-trip tests", () => {
     };
 
     const kyoproString = convertOpsToKyoproOps(originalOps);
-    expect(() => convertKyoproOpsToOps(kyoproString)).toThrow("Negative number not allowed: -13");
+    expect(() => convertKyoproOpsToOps(kyoproString)).toThrow(
+      "Negative number not allowed: -13"
+    );
   });
 
   it("handles round-trip with extreme values", () => {
@@ -438,6 +440,8 @@ describe("round-trip tests", () => {
     };
 
     const kyoproString = convertOpsToKyoproOps(originalOps);
-    expect(() => convertKyoproOpsToOps(kyoproString)).toThrow("Negative number not allowed: -999999");
+    expect(() => convertKyoproOpsToOps(kyoproString)).toThrow(
+      "Negative number not allowed: -999999"
+    );
   });
 });
