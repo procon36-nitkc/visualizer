@@ -18,7 +18,7 @@
       </div>
 
       <div>
-        <UTabs :items="items">
+        <UTabs :items="items" default-value="json">
           <template #json="{ item }">
             <div>
               <div>
@@ -58,6 +58,7 @@
               placeholder="N
 A1,1 A1,2 ... A1,N
 A2,1 A2,2 ... A2,N
+...
 AN,1 AN,2 ... AN,N"
               :rows="5"
             />
@@ -73,7 +74,11 @@ AN,1 AN,2 ... AN,N"
                 <UTextarea
                   v-model="opsKyoproInput"
                   class="mt-1 w-full font-mono text-sm"
-                  placeholder='{"ops": [{"x":0,"y":0,"n":2},{"x":0,"y":0,"n":2}]}'
+                  placeholder='N
+x1 y1 n1
+x2 y2 n2
+...
+xN yN nN'
                   :rows="5"
                 />
                 <UButton class="mt-2" @click="handleKyoproOpsLoad" color="primary"
@@ -211,7 +216,6 @@ const handleKyoproOpsLoad = () => {
         typeof op.y === "number" &&
         typeof op.n === "number" &&
         op.n > 0 &&
-        op.n % 2 === 0 &&
         op.x >= 0 &&
         op.y >= 0 &&
         op.x + op.n <= fieldStore.size &&
