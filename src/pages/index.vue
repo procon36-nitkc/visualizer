@@ -176,23 +176,21 @@ const handleKyoproProblemLoad = () => {
 const opsInput = ref("");
 const handleOpsLoad = () => {
   try {
-    const parsed: OperationInput = JSON.parse(opsInput.value);
-    if (!Array.isArray(parsed.ops)) throw new Error("invalid");
-    const ok = parsed.ops.every(
-      (op) =>
-        typeof op.x === "number" &&
-        typeof op.y === "number" &&
-        typeof op.n === "number" &&
-        op.n > 0 &&
-        op.n % 2 === 0 &&
-        op.x >= 0 &&
-        op.y >= 0 &&
-        op.x + op.n <= fieldStore.size &&
-        op.y + op.n <= fieldStore.size
-    );
-    if (!ok) throw new Error("invalid-range");
-    operations.value = parsed;
-    opsLoadStatus.value = true;
+    const parsed: OperationInput = JSON.parse(opsInput.value)
+    if (!Array.isArray(parsed.ops)) throw new Error('invalid')
+    const ok = parsed.ops.every(op =>
+      typeof op.x === 'number' &&
+      typeof op.y === 'number' &&
+      typeof op.n === 'number' &&
+      op.n > 0 &&
+      op.x >= 0 &&
+      op.y >= 0 &&
+      op.x + op.n <= fieldStore.size &&
+      op.y + op.n <= fieldStore.size
+    )
+    if (!ok) throw new Error('invalid-range')
+    operations.value = parsed
+    opsLoadStatus.value = true
   } catch (e) {
     opsLoadStatus.value = false;
   }
