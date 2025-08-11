@@ -27,7 +27,7 @@ const firstTap = computed(() => tapBuffer.value.length === 1 ? tapBuffer.value[0
 
 const overlay = ref<{ op: Operation; angle: number; cells: number[][]; opacity: number } | null>(null)
 
-const OPACITY_TRANSITION_DURATION = 100 // ms
+const OPACITY_TRANSITION_DURATION = 25 // ms
 
 const isInGarden = (x: number, y: number): boolean => {
   if (selected.value.length < 2) return false
