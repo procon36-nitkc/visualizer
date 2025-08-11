@@ -9,7 +9,7 @@ const boardRef = ref<HTMLElement | null>(null)
 
 const overlay = ref<{ op: Operation; angle: number; cells: number[][]; opacity: number } | null>(null)
 
-const OPACITY_TRANSITION_DURATION = 100 // ms
+const OPACITY_TRANSITION_DURATION = 25 // ms
 const scale = ref(1)
 
 const isDragging = ref(false)
@@ -149,7 +149,7 @@ const overlayStyle = computed(() => {
     transform: `rotate(${overlay.value.angle}deg)`,
     transformOrigin: 'center center',
     opacity: `${overlay.value.opacity}`,
-    transition: `transform ${fieldStore.animationDuration}ms ease-in-out, opacity ${OPACITY_TRANSITION_DURATION}ms ease-in-out`,
+    transition: `transform ${fieldStore.animationDuration}ms ease-in-out, opacity ${fieldStore.animationDuration/2}ms ease-in-out`,
   }
 })
 
@@ -171,7 +171,7 @@ async function animateRotation(op: Operation, apply: () => void) {
     }
   })
   apply()
-  await new Promise((resolve) => setTimeout(resolve, OPACITY_TRANSITION_DURATION)) // opacity transition time
+  await new Promise((resolve) => setTimeout(resolve, fieldStore.animationDuration/2)) // opacity transition time
   await nextTick()
   overlay.value = null
 }
