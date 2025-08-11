@@ -116,7 +116,7 @@ import { useFieldStore } from "@/stores/field";
 import {
   type ProblemInput,
   type OperationInput,
-  isProblem as isProblemInput,
+  isProblemInput,
   isOperationInput,
 } from "@/types";
 import type { TabsItem } from "@nuxt/ui";
@@ -153,6 +153,8 @@ const handleProblemLoad = () => {
     }
     fieldStore.setFieldFromProblem(parsed.problem);
     size.value = parsed.problem.field.entities.length;
+    const KyoproProblem = convertProblemToKyopro(parsed.problem);
+    kyoproProblemInput.value = KyoproProblem;
   } catch (e) {
     alert("JSONの形式が正しくありません");
   }
@@ -196,6 +198,8 @@ const handleOpsLoad = () => {
     if (!ok) throw new Error('invalid-range')
     operations.value = parsed
     opsLoadStatus.value = true
+    const KyoproOps = convertOpsToKyoproOps(parsed)
+    opsKyoproInput.value = KyoproOps
   } catch (e) {
     opsLoadStatus.value = false;
   }

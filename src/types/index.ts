@@ -45,18 +45,7 @@ export const isProblemInput = (problem: any): problem is ProblemInput => {
     problem !== null &&
     problem !== undefined &&
     typeof problem === "object" &&
-    problem.problem !== null &&
-    problem.problem !== undefined &&
-    typeof problem.problem === "object" &&
-    problem.problem.field !== null &&
-    typeof problem.problem.field === "object" &&
-    problem.problem.field.size !== null &&
-    typeof problem.problem.field.size === "number" &&
-    Array.isArray(problem.problem.field.entities) &&
-    problem.problem.field.entities.every(
-      (row: any[]) =>
-        Array.isArray(row) && row.every((entity) => typeof entity === "number")
-    )
+    isProblem(problem.problem)
   );
 };
 
