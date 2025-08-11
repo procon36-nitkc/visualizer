@@ -228,7 +228,6 @@ const handleKyoproOpsLoad = () => {
     if (!ok) throw new Error("invalid-range");
     operations.value = parsed;
     opsInput.value = JSON.stringify(parsed, null, 2);
-    size.value = parsed.ops.length;
     opsLoadStatus.value = true;
   } catch (e) {
     console.error(e);
