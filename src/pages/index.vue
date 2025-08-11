@@ -74,11 +74,11 @@ AN,1 AN,2 ... AN,N"
                 <UTextarea
                   v-model="opsKyoproInput"
                   class="mt-1 w-full font-mono text-sm"
-                  placeholder='N
+                  placeholder='M
 x1 y1 n1
 x2 y2 n2
 ...
-xN yN nN'
+xM yM nM'
                   :rows="5"
                 />
                 <UButton class="mt-2" @click="handleKyoproOpsLoad" color="primary"
