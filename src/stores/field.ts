@@ -17,16 +17,27 @@ export const useFieldStore = defineStore("field", () => {
 
   const animationDuration = ref(500); // ms default
   let animTimeout: ReturnType<typeof setTimeout> | null = null;
+  let animResolve: (() => void) | null = null;
 
   const isPlaying = ref(false);
+  const playbackIndex = ref(0);
   let playbackSnapshot: number[][] | null = null;
   let playbackStartIndex: number | null = null;
   let playbackLength = 0;
 
-  const clearAnimation = () => {
+  const clearAnimation = (applyPending = false) => {
     if (animTimeout) {
       clearTimeout(animTimeout);
       animTimeout = null;
+    }
+    if (applyPending && animation.value) {
+      const { op, clockwise } = animation.value;
+      field.value = applyRotation(field.value, op.x, op.y, op.n, clockwise);
+      history.value.push({ ...op });
+    }
+    if (animResolve) {
+      animResolve();
+      animResolve = null;
     }
     animation.value = null;
   };
@@ -79,6 +90,7 @@ export const useFieldStore = defineStore("field", () => {
     animation.value = { op, clockwise, from: field.value.map((r) => [...r]) };
 
     await new Promise<void>((resolve) => {
+      animResolve = resolve;
       animTimeout = setTimeout(() => {
         field.value = applyRotation(field.value, op.x, op.y, op.n, clockwise);
         if (recordHistory) history.value.push({ ...op });
@@ -92,6 +104,7 @@ export const useFieldStore = defineStore("field", () => {
     playbackSnapshot = null;
     playbackStartIndex = null;
     playbackLength = 0;
+    playbackIndex.value = 0;
   };
 
   const rotate = (x: number, y: number, n: number): void => {
@@ -103,25 +116,31 @@ export const useFieldStore = defineStore("field", () => {
     if (isPlaying.value) return;
     clearAnimation();
     if (
-      !playbackSnapshot ||
-      playbackStartIndex === null ||
+      playbackSnapshot &&
+      playbackStartIndex !== null &&
       history.value.length !== playbackStartIndex + playbackLength
     ) {
-      playbackSnapshot = field.value.map((r) => [...r]);
-      playbackStartIndex = history.value.length;
-    } else {
+      alert("最初から再生し直します。回転操作は失われますがよいですか？");
       field.value = playbackSnapshot.map((r) => [...r]);
       history.value = history.value.slice(0, playbackStartIndex);
+      playbackLength = 0;
+      playbackIndex.value = 0;
+    }
+    if (!playbackSnapshot || playbackStartIndex === null) {
+      playbackSnapshot = field.value.map((r) => [...r]);
+      playbackStartIndex = history.value.length;
     }
 
-    playbackLength = 0;
+    playbackIndex.value = playbackLength;
     isPlaying.value = true;
     try {
-      for (const op of ops) {
+      for (let i = playbackLength; i < ops.length; i++) {
         if (!isPlaying.value) break;
+        const op = ops[i];
         await applyOperation(op, true, true);
         playbackLength++;
-        if (!animator.value) {
+        playbackIndex.value = playbackLength;
+        if (!animator.value && isPlaying.value) {
           await new Promise((r) => setTimeout(r, animationDuration.value));
         }
       }
@@ -133,7 +152,7 @@ export const useFieldStore = defineStore("field", () => {
 
   const stopPlayback = () => {
     isPlaying.value = false;
-    clearAnimation();
+    clearAnimation(true);
   };
 
   const resetField = (): void => {
@@ -212,6 +231,41 @@ export const useFieldStore = defineStore("field", () => {
     };
   });
 
+  const beginSeek = (ops: Operation[]) => {
+    if (
+      !playbackSnapshot ||
+      playbackStartIndex === null ||
+      history.value.length !== playbackStartIndex + playbackLength
+    ) {
+      playbackSnapshot = field.value.map((r) => [...r]);
+      playbackStartIndex = history.value.length;
+    } else {
+      field.value = playbackSnapshot.map((r) => [...r]);
+      history.value = history.value.slice(0, playbackStartIndex);
+    }
+    playbackIndex.value = playbackLength;
+  };
+
+  const seekTo = (index: number, ops: Operation[]) => {
+    if (!playbackSnapshot || playbackStartIndex === null) return;
+    field.value = playbackSnapshot.map((r) => [...r]);
+    history.value = history.value.slice(0, playbackStartIndex);
+    playbackIndex.value = Math.max(0, Math.min(index, ops.length));
+    for (let i = 0; i < playbackIndex.value; i++) {
+      const op = ops[i];
+      field.value = applyRotation(field.value, op.x, op.y, op.n, true);
+      history.value.push({ ...op });
+    }
+  };
+
+  const commitSeek = (index: number, ops: Operation[]) => {
+    seekTo(index, ops);
+    playbackLength = playbackIndex.value;
+    if (playbackLength === 0) {
+      clearPlaybackSnapshot();
+    }
+  };
+
 
   return {
     size,
@@ -222,6 +276,7 @@ export const useFieldStore = defineStore("field", () => {
     animation,
     animationDuration,
     isPlaying,
+    playbackIndex,
     setAnimator,
     generateField,
     applyOperation,
@@ -232,5 +287,8 @@ export const useFieldStore = defineStore("field", () => {
     undo,
     setFieldFromProblem,
     exportHistoryAsOps,
+    beginSeek,
+    seekTo,
+    commitSeek,
   };
 });
