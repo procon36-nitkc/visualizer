@@ -122,8 +122,8 @@ const stepSeek = (delta: number) => {
         />
 
         <div class="flex items-center gap-1 ml-2">
-          <span class="text-sm"
-            >{{ fieldStore.playbackIndex }}/{{ props.operations.length }}</span
+          <span class="text-sm min-w-[10rem]"
+            >step: {{ fieldStore.playbackIndex }}/{{ props.operations.length }}</span
           >
           <label class="text-sm ml-1">N</label>
           <UInput
