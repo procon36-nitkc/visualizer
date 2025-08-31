@@ -17,6 +17,7 @@ const fieldStore = useFieldStore();
 const showExport = ref(false);
 const completeStatus = ref<boolean | null>(null); // ← 完成状態の保持
 const isPlaying = computed(() => fieldStore.isPlaying);
+const customStep = ref(10);
 
 const topLeft = computed(() => {
   if (props.selected.length < 2) return { x: 0, y: 0 };
@@ -67,6 +68,15 @@ const handleReset = () => {
 const handleCheckComplete = () => {
   completeStatus.value = isFieldComplete(fieldStore.field);
 };
+
+const stepSeek = (delta: number) => {
+  const target = Math.min(
+    Math.max(fieldStore.playbackIndex + delta, 0),
+    props.operations.length
+  );
+  fieldStore.beginSeek(props.operations);
+  fieldStore.commitSeek(target, props.operations);
+};
 </script>
 
 <template>
@@ -95,8 +105,72 @@ const handleCheckComplete = () => {
           :disabled="!isPlaying"
           icon="i-heroicons-pause"
         >
-          停止
+          一時停止
         </UButton>
+
+        <input
+          type="range"
+          min="0"
+          :max="props.operations.length"
+          v-model.number="fieldStore.playbackIndex"
+          @mousedown="fieldStore.beginSeek(props.operations)"
+          @input="fieldStore.seekTo(fieldStore.playbackIndex, props.operations)"
+          @mouseup="fieldStore.commitSeek(fieldStore.playbackIndex, props.operations)"
+          @touchend="fieldStore.commitSeek(fieldStore.playbackIndex, props.operations)"
+          :disabled="isPlaying"
+          class="w-48"
+        />
+
+        <div class="flex items-center gap-1 ml-2">
+          <span class="text-sm min-w-[10rem]"
+            >step: {{ fieldStore.playbackIndex }}/{{ props.operations.length }}</span
+          >
+          <label class="text-sm ml-1">N</label>
+          <UInput
+            v-model.number="customStep"
+            type="number"
+            min="1"
+            class="w-16"
+            :disabled="isPlaying"
+          />
+          <UButton
+            @click="stepSeek(-customStep)"
+            :disabled="isPlaying"
+            size="xs"
+            >{{ customStep }}手戻る</UButton
+          >
+          <UButton
+            @click="stepSeek(-5)"
+            :disabled="isPlaying"
+            size="xs"
+            >5手戻る</UButton
+          >
+          <UButton
+            @click="stepSeek(-1)"
+            :disabled="isPlaying"
+            size="xs"
+            >1手戻る</UButton
+          >
+          <span>|</span>
+          <UButton
+            @click="stepSeek(1)"
+            :disabled="isPlaying"
+            size="xs"
+            >1手進む</UButton
+          >
+          <UButton
+            @click="stepSeek(5)"
+            :disabled="isPlaying"
+            size="xs"
+            >5手進む</UButton
+          >
+          <UButton
+            @click="stepSeek(customStep)"
+            :disabled="isPlaying"
+            size="xs"
+            >{{ customStep }}手進む</UButton
+          >
+        </div>
 
         <UButton
           @click="fieldStore.undo"
