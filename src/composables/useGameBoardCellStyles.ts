@@ -18,8 +18,8 @@ export const useGameBoardCellStyles = (
   const getBaseCellStyle = (value: number): Record<string, string> => {
     const totalValues = (fieldStore.size * fieldStore.size) / 2
     const hue = (value * 47) % 360
-    const saturation = (value % 30) + 20
-    const lightness = 95 - Math.floor((value / totalValues) * 30)
+    const saturation = (value % 15) + 20
+    const lightness = 95 - Math.floor((value / totalValues) * 15)
     const textLightness = lightness < 65 ? 95 : 15
 
     return {
