@@ -1,11 +1,17 @@
 <script setup lang="ts">
 // TODO: GameBoardMobile.vueとGameBoardDesktop.vueの共通部分を抽出して、1つのコンポーネントにまとめる
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useFieldStore } from '@/stores/field'
-import type { Operation } from '@/types'
+import { useGameUiStore } from '@/stores/gameUi'
+import { useGameBoardCellStyles } from '@/composables/useGameBoardCellStyles'
+import { useGameBoardOverlay } from '@/composables/useGameBoardOverlay'
+import { getCellPositionFromTarget } from '@/utils/boardCellPosition'
+import type { Position } from '@/types'
+import { storeToRefs } from 'pinia'
 
 const fieldStore = useFieldStore()
-const selected = defineModel<{ x: number; y: number }[]>('selected')
+const gameUiStore = useGameUiStore()
+const { selected } = storeToRefs(gameUiStore)
 
 // ズーム・パン状態
 const scale = ref(1)
@@ -21,72 +27,15 @@ let initialScale = 1
 let panStart = { x: 0, y: 0 }
 
 // 2点タップ保持
-const tapBuffer = ref<{ x: number; y: number }[]>([])
+const tapBuffer = ref<Position[]>([])
 
 const firstTap = computed(() => tapBuffer.value.length === 1 ? tapBuffer.value[0] : null)
 
-const overlay = ref<{ op: Operation; angle: number; cells: number[][]; opacity: number } | null>(null)
-
-const OPACITY_TRANSITION_DURATION = 25 // ms
-
-const isInGarden = (x: number, y: number): boolean => {
-  if (selected.value.length < 2) return false
-  const [a, b] = selected.value
-  const topX = Math.min(a.x, b.x)
-  const topY = Math.min(a.y, b.y)
-  const n = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) + 1
-  return x >= topX && x < topX + n && y >= topY && y < topY + n
-}
-
-const getBaseCellStyle = (value: number): Record<string, string> => {
-  const totalValues = (fieldStore.size * fieldStore.size) / 2
-  const hue = (value * 47) % 360
-  const saturation = 60 + (value % 20)
-  let lightness = 85 - Math.floor((value / totalValues) * 30)
-  const textLightness = lightness < 65 ? 95 : 15
-  return {
-    backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-    color: `hsl(${hue}, 40%, ${textLightness}%)`,
-  }
-}
-
-const getCellStyleObject = (value: number, x: number, y: number): Record<string, string> => {
-  const base = getBaseCellStyle(value)
-  if (isInGarden(x, y)) {
-    const m = /hsl\((\d+), (\d+)%\, (\d+)%\)/.exec(base.backgroundColor || '')
-    if (m) {
-      const l = Number(m[3]) - 10
-      base.backgroundColor = `hsl(${m[1]}, ${m[2]}%, ${l}%)`
-    }
-  }
-  return base
-}
-
-const cellFontSize = computed(() => {
-  const s = fieldStore.size
-  if (s <= 6) return '1.5rem'
-  if (s <= 10) return '1.25rem'
-  if (s <= 16) return '1rem'
-  if (s <= 20) return '0.875rem'
-  return '0.75rem'
+const { isInGarden, getBaseCellStyle, getCellStyleObject, cellFontSize } = useGameBoardCellStyles(selected, {
+  inGardenLightnessDelta: 10,
 })
-
-const overlayStyle = computed(() => {
-  if (!overlay.value) return {}
-  const cellEl = document.querySelector('.cell') as HTMLElement | null
-  if (!cellEl) return {}
-  const size = cellEl.offsetWidth
-  return {
-    top: `${overlay.value.op.y * size}px`,
-    left: `${overlay.value.op.x * size}px`,
-    width: `${overlay.value.op.n * size}px`,
-    height: `${overlay.value.op.n * size}px`,
-    transform: `rotate(${overlay.value.angle}deg)`,
-    transformOrigin: 'center center',
-    opacity: `${overlay.value.opacity}`,
-    transition: `transform ${fieldStore.animationDuration}ms ease-in-out, opacity ${OPACITY_TRANSITION_DURATION}ms ease-in-out`,
-  }
-})
+const boardRef = ref<HTMLElement | null>(null)
+const { overlay, overlayStyle } = useGameBoardOverlay(boardRef)
 
 const boardStyle = computed(() => ({
   transform: `translate(${translateX.value}px, ${translateY.value}px) scale(${scale.value})`,
@@ -94,36 +43,7 @@ const boardStyle = computed(() => ({
   transition: 'transform 0.05s linear',
 }))
 
-async function animateRotation(op: Operation, apply: () => void) {
-  const cells: number[][] = []
-  for (let y = 0; y < op.n; y++) {
-    cells.push(fieldStore.field[op.y + y].slice(op.x, op.x + op.n))
-  }
-  overlay.value = { op, angle: 0, cells }
-  await nextTick()
-  requestAnimationFrame(() => {
-    if (overlay.value) overlay.value.angle = 90
-  })
-  await new Promise((resolve) => setTimeout(resolve, fieldStore.animationDuration))
-  apply()
-  await nextTick()
-  overlay.value = null
-}
-
-onMounted(() => {
-  fieldStore.setAnimator(animateRotation)
-})
-onUnmounted(() => {
-  fieldStore.setAnimator(null)
-})
-
-const getCellFromTouch = (e: TouchEvent): { x: number; y: number } | null => {
-  const target = (e.target as HTMLElement)?.closest('.cell')
-  if (!target) return null
-  const x = Number(target.dataset.x)
-  const y = Number(target.dataset.y)
-  return isNaN(x) || isNaN(y) ? null : { x, y }
-}
+const getCellFromTouch = (e: TouchEvent): Position | null => getCellPositionFromTarget(e.target)
 
 const handleTouchStart = (e: TouchEvent) => {
   touchStartAt.value = Date.now()
@@ -165,13 +85,13 @@ const handleTouchEnd = (e: TouchEvent) => {
   if (!moved && duration < 100 && touchMode.value === 'select') {
     const pos = getCellFromTouch(e)
     if (pos) {
-      if (tapBuffer.value.length === 2){
+      if (tapBuffer.value.length === 2) {
         tapBuffer.value = []
-        selected.value = []
+        gameUiStore.clearSelected()
       }
       tapBuffer.value.push(pos)
       if (tapBuffer.value.length === 2) {
-        selected.value = [...tapBuffer.value]
+        gameUiStore.setSelected([...tapBuffer.value])
       }
     }
   }
@@ -183,56 +103,28 @@ const handleTouchEnd = (e: TouchEvent) => {
 </script>
 
 <template>
-  <div
-    class="w-full h-[80vh] overflow-hidden touch-none border rounded bg-white dark:bg-neutral-900"
-    @touchstart.passive="handleTouchStart"
-    @touchmove.passive="handleTouchMove"
-    @touchend="handleTouchEnd"
-  >
-    <div
-      class="select-none origin-top-left inline-block"
-      :style="boardStyle"
-    >
-      <div
-        class="grid relative"
-        :style="{ gridTemplateColumns: `repeat(${fieldStore.size}, minmax(2.5rem, 1fr))` }"
+  <div class="w-full h-[80vh] overflow-hidden touch-none border rounded bg-white dark:bg-neutral-900"
+    @touchstart.passive="handleTouchStart" @touchmove.passive="handleTouchMove" @touchend="handleTouchEnd">
+    <div ref="boardRef" class="select-none origin-top-left inline-block" :style="boardStyle">
+      <GameBoardGridBase
+        board-class="grid relative"
+        :field="fieldStore.field"
+        :size="fieldStore.size"
+        :overlay="overlay"
+        :overlay-style="overlayStyle"
+        overlay-class-name="z-50"
+        :cell-font-size="cellFontSize"
+        :get-base-cell-style="getBaseCellStyle"
+        :get-cell-style-object="getCellStyleObject"
       >
-        <div
-          v-if="overlay"
-          class="absolute z-50 pointer-events-none grid border-2 border-red-500"
-          :style="{ ...overlayStyle, gridTemplateColumns: `repeat(${overlay.op.n}, minmax(2.5rem, 1fr))` }"
-        >
-          <template v-for="(row, oy) in overlay.cells" :key="`o-${oy}`">
-            <div
-              v-for="(cell, ox) in row"
-              :key="`o-${oy}-${ox}`"
-              class="cell relative aspect-square border border-gray-300 dark:border-neutral-700 text-center flex items-center justify-center font-bold"
-              :style="{ ...getBaseCellStyle(cell), fontSize: cellFontSize }"
-            >
-            </div>
-          </template>
-        </div>
-        <template v-for="(row, y) in fieldStore.field" :key="y">
+        <template #cell-overlay="{ x, y }">
+          <div v-if="isInGarden(x, y)" class="animated-border" />
           <div
-            v-for="(cell, x) in row"
-            :key="`${y}-${x}`"
-            class="cell relative aspect-square border border-gray-300 dark:border-neutral-700 text-center flex items-center justify-center font-bold"
-            :data-x="x"
-            :data-y="y"
-            :style="getCellStyleObject(cell, x, y)"
-          >
-            {{ cell }}
-            <div
-    v-if="isInGarden(x, y)"
-    class="animated-border"
-  />
-  <div
-  v-if="firstTap && firstTap.x === x && firstTap.y === y"
-  class="animated-border border-blue-500"
-></div>
-          </div>
+            v-if="firstTap && firstTap.x === x && firstTap.y === y"
+            class="animated-border border-blue-500"
+          />
         </template>
-      </div>
+      </GameBoardGridBase>
     </div>
   </div>
 </template>
@@ -246,6 +138,7 @@ const handleTouchEnd = (e: TouchEvent) => {
   from {
     background-position: 0 0;
   }
+
   to {
     background-position: 100% 0;
   }
@@ -262,7 +155,7 @@ const handleTouchEnd = (e: TouchEvent) => {
 }
 
 .animated-border.border-blue-500 {
-  border-color: #3b82f6; /* Tailwind's blue-500 */
+  border-color: #3b82f6;
+  /* Tailwind's blue-500 */
 }
-
 </style>

@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useFieldStore } from '@/stores/field'
-import type { Operation } from '@/types'
-
-// ===== 型定義 =====
-type Position = { x: number; y: number }
+import { useGameUiStore } from '@/stores/gameUi'
+import { useGameBoardCellStyles } from '@/composables/useGameBoardCellStyles'
+import { useGameBoardOverlay } from '@/composables/useGameBoardOverlay'
+import { useSelectionGeometry } from '@/composables/useSelectionGeometry'
+import { getCellPositionFromTarget } from '@/utils/boardCellPosition'
+import type { Position } from '@/types'
+import { storeToRefs } from 'pinia'
 
 interface PairInfo {
   value: number
@@ -33,36 +36,36 @@ const PAIR_VISUALIZATION_CONFIG = {
   opacity: {
     min: 0.0,           // 最小透明度（遠い場合）
     max: 0.8,           // 最大透明度（近い場合）
-    minDistance: 2,     // この距離以下で最大透明度
-    maxDistance: 6,     // この距離以上で最小透明度
+  },
+  color: {
+    adjacent: '#147637', // 隣接ペアの色（緑）
+    nonAdjacent: '#ef4444' // 非隣接ペアの色（赤）
   }
 } as const
 
 const fieldStore = useFieldStore()
-const selected = defineModel<{ x: number; y: number }[]>('selected')
+const gameUiStore = useGameUiStore()
+const { selected, pairMinDistance, pairMaxDistance } = storeToRefs(gameUiStore)
 const boardRef = ref<HTMLElement | null>(null)
+const { getBaseCellStyle, getCellStyleObject, cellFontSize } = useGameBoardCellStyles(selected, {
+  inGardenLightnessDelta: 30,
+})
+const { overlay, overlayStyle } = useGameBoardOverlay(boardRef)
+const { topLeft, squareSize, isInSelectionRect } = useSelectionGeometry(selected)
 
-const overlay = ref<{ op: Operation; angle: number; cells: number[][]; opacity: number } | null>(null)
-
-const OPACITY_TRANSITION_DURATION = 25 // ms
 const scale = ref(1)
 
 const isDragging = ref(false)
-const dragStart = ref<{ x: number; y: number } | null>(null)
+const dragStart = ref<Position | null>(null)
 
-function getCellFromEvent(e: Event): { x: number; y: number } | null {
-  const target = (e.target as HTMLElement)?.closest('.cell')
-  if (!target) return null
-  const x = Number(target.dataset.x)
-  const y = Number(target.dataset.y)
-  if (isNaN(x) || isNaN(y)) return null
-  return { x, y }
+function getCellFromEvent(e: Event): Position | null {
+  return getCellPositionFromTarget(e.target)
 }
 
 const handleMouseDown = (e: MouseEvent) => {
   const pos = getCellFromEvent(e)
   if (!pos) return
-  selected.value = [pos]
+  gameUiStore.setSelected([pos])
   dragStart.value = pos
   isDragging.value = true
 }
@@ -71,7 +74,7 @@ const handleMouseMove = (e: MouseEvent) => {
   if (!isDragging.value || !dragStart.value) return
   const pos = getCellFromEvent(e)
   if (pos) {
-    selected.value = [dragStart.value, pos]
+    gameUiStore.setSelected([dragStart.value, pos])
   }
 }
 
@@ -79,21 +82,6 @@ const handleMouseUp = () => {
   isDragging.value = false
   dragStart.value = null
 }
-
-const topLeft = computed(() => {
-  if (selected.value.length < 2) return null
-  const [a, b] = selected.value
-  return {
-    x: Math.min(a.x, b.x),
-    y: Math.min(a.y, b.y),
-  }
-})
-
-const squareSize = computed(() => {
-  if (selected.value.length < 2) return 0
-  const [a, b] = selected.value
-  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) + 1
-})
 
 const selectionStyle = computed(() => {
   const size = squareSize.value
@@ -111,28 +99,11 @@ const isTopLeftCorner = (x: number, y: number) => {
 }
 
 const getCellClass = (x: number, y: number) => {
-  if (selected.value.length < 2) return ''
-  const [a, b] = selected.value
-  const x0 = Math.min(a.x, b.x)
-  const x1 = Math.max(a.x, b.x)
-  const y0 = Math.min(a.y, b.y)
-  const y1 = Math.max(a.y, b.y)
-
-  if (x >= x0 && x <= x1 && y >= y0 && y <= y1) {
+  if (isInSelectionRect(x, y)) {
     return 'border-green-500 ring-2 ring-green-300'
   }
 
   return ''
-}
-
-const isInGarden = (x: number, y: number): boolean => {
-  if (selected.value.length < 2) return false
-  const [a, b] = selected.value
-  const topX = Math.min(a.x, b.x)
-  const topY = Math.min(a.y, b.y)
-  const n = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) + 1
-
-  return x >= topX && x < topX + n && y >= topY && y < topY + n
 }
 
 // ===== ペア検出とメトリクス計算 =====
@@ -196,21 +167,22 @@ const getPairDistance = (pair: PairInfo): number => {
  * - 中間: 線形補間
  */
 const calculateOpacityFromDistance = (distance: number): number => {
-  const { min, max, minDistance, maxDistance } = PAIR_VISUALIZATION_CONFIG.opacity
+  const { min, max } = PAIR_VISUALIZATION_CONFIG.opacity
   
   // 最小距離以下の場合は最大透明度
-  if (distance <= minDistance) {
+  if (distance <= pairMinDistance.value) {
     return max
   }
   
   // 最大距離以上の場合は最小透明度
-  if (distance >= maxDistance) {
+  if (distance >= pairMaxDistance.value) {
     return min
   }
   
   // 中間の場合は線形補間
-  const range = maxDistance - minDistance
-  const progress = (distance - minDistance) / range
+  const range = pairMaxDistance.value - pairMinDistance.value
+  if (range <= 0) return max
+  const progress = (distance - pairMinDistance.value) / range
   return max - (max - min) * progress
 }
 
@@ -415,111 +387,6 @@ const getCellCenter = (pos: { x: number; y: number }): { x: number; y: number } 
   }
 }
 
-const getBaseCellStyle = (value: number): Record<string, string> => {
-  const totalValues = (fieldStore.size * fieldStore.size) / 2
-  const hue = (value * 47) % 360
-  const saturation = 60 + (value % 20)
-  let lightness = 85 - Math.floor((value / totalValues) * 30)
-  const textLightness = lightness < 65 ? 95 : 15
-
-  return {
-    backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-    color: `hsl(${hue}, 40%, ${textLightness}%)`,
-  }
-}
-
-
-const getCellStyleObject = (value: number, x: number, y: number): Record<string, string> => {
-  const base = getBaseCellStyle(value)
-
-  if (isInGarden(x, y)) {
-    const m = /hsl\((\d+), (\d+)%\, (\d+)%\)/.exec(base.backgroundColor || '')
-    if (m) {
-      const l = Number(m[3]) - 30
-      base.backgroundColor = `hsl(${m[1]}, ${m[2]}%, ${l}%)`
-    }
-  }
-  return base
-}
-
-const cellFontSize = computed(() => {
-  const s = fieldStore.size
-  if (s <= 6) return '1.5rem'
-  if (s <= 10) return '1.25rem'
-  if (s <= 16) return '1rem'
-  if (s <= 20) return '0.875rem'
-  return '0.75rem'
-})
-
-const overlayStyle = computed(() => {
-  if (!overlay.value || !boardRef.value) return {}
-  const cellEl = boardRef.value.querySelector('.cell') as HTMLElement | null
-  if (!cellEl) return {}
-  const size = cellEl.offsetWidth
-  return {
-    top: `${overlay.value.op.y * size}px`,
-    left: `${overlay.value.op.x * size}px`,
-    width: `${overlay.value.op.n * size}px`,
-    height: `${overlay.value.op.n * size}px`,
-    transform: `rotate(${overlay.value.angle}deg)`,
-    transformOrigin: 'center center',
-    opacity: `${overlay.value.opacity}`,
-    transition: `opacity ${fieldStore.animationDuration/2}ms ease-in-out`,
-  }
-})
-
-// ===== アニメーション制御 =====
-/**
- * 回転アニメーションを実行
- * - angleを0から90まで線形に更新（requestAnimationFrameループ）
- * - CSS transitionは使用せず、JavaScriptで完全制御
- */
-async function animateRotation(op: Operation, apply: () => void) {
-  const cells: number[][] = []
-  for (let y = 0; y < op.n; y++) {
-    cells.push(fieldStore.field[op.y + y].slice(op.x, op.x + op.n))
-  }
-  overlay.value = { op, angle: 0, cells, opacity: 1 }
-  await nextTick()
-  
-  // angleを段階的に更新してスムーズなアニメーションを実現（線形移動）
-  const startTime = performance.now()
-  const duration = fieldStore.animationDuration
-  
-  const animate = (currentTime: number) => {
-    if (!overlay.value) return
-    
-    const elapsed = currentTime - startTime
-    const progress = Math.min(elapsed / duration, 1)
-    
-    // 線形補間（ease-in-outなし）
-    overlay.value.angle = progress * 90
-    
-    if (progress < 1) {
-      requestAnimationFrame(animate)
-    } else {
-      // アニメーション完了
-      if (overlay.value) {
-        overlay.value.opacity = 0
-      }
-    }
-  }
-  
-  requestAnimationFrame(animate)
-  
-  await new Promise((resolve) => setTimeout(resolve, duration))
-  apply()
-  await new Promise((resolve) => setTimeout(resolve, fieldStore.animationDuration/2)) // opacity transition time
-  await nextTick()
-  overlay.value = null
-}
-
-onMounted(() => {
-  fieldStore.setAnimator(animateRotation)
-})
-onUnmounted(() => {
-  fieldStore.setAnimator(null)
-})
 </script>
 
 <template>
@@ -531,21 +398,26 @@ onUnmounted(() => {
     @mouseup="handleMouseUp"
     @mouseleave="handleMouseUp"
   >
-    <div
-      class="grid select-none relative w-fit"
-      :style="{ 
-        transform: `scale(${scale})`,
-        transformOrigin: 'center center',
-        gridTemplateColumns: `repeat(${fieldStore.size}, minmax(2.5rem, 1fr))`
-      }"
+    <GameBoardGridBase
+      board-class="grid select-none relative w-fit"
+      :board-style="{ transform: `scale(${scale})`, transformOrigin: 'center center' }"
+      :field="fieldStore.field"
+      :size="fieldStore.size"
+      :overlay="overlay"
+      :overlay-style="overlayStyle"
+      :cell-font-size="cellFontSize"
+      cell-class-name="cursor-pointer transition-all duration-100 ease-in-out"
+      :get-base-cell-style="getBaseCellStyle"
+      :get-cell-style-object="getCellStyleObject"
+      :get-cell-class="getCellClass"
     >
-      <!-- ペアを結ぶ線のSVGオーバーレイ -->
-      <svg
-        class="absolute inset-0 pointer-events-none z-30 w-full h-full"
-        :viewBox="`0 0 ${fieldStore.size} ${fieldStore.size}`"
-        preserveAspectRatio="none"
-        style="overflow: visible;"
-      >
+      <template #background-layer>
+        <svg
+          class="absolute inset-0 pointer-events-none z-30 w-full h-full"
+          :viewBox="`0 0 ${fieldStore.size} ${fieldStore.size}`"
+          preserveAspectRatio="none"
+          style="overflow: visible;"
+        >
         <!-- 両方が範囲外のペア（通常表示） -->
         <g v-for="pair in classifyPairs.bothOutside" :key="`pair-outside-${pair.value}`">
           <!-- 線 -->
@@ -554,7 +426,7 @@ onUnmounted(() => {
             :y1="getCellCenter(pair.positions[0]).y"
             :x2="getCellCenter(pair.positions[1]).x"
             :y2="getCellCenter(pair.positions[1]).y"
-            :stroke="pair.isAdjacent ? '#22c55e' : '#ef4444'"
+            :stroke="pair.isAdjacent ? PAIR_VISUALIZATION_CONFIG.color.adjacent : PAIR_VISUALIZATION_CONFIG.color.nonAdjacent"
             :stroke-width="(pair.isAdjacent ? 0.16 : 0.08)"
             stroke-linecap="round"
             :stroke-opacity="getPairOpacity(pair)"
@@ -565,7 +437,7 @@ onUnmounted(() => {
             :cx="getCellCenter(pair.positions[0]).x"
             :cy="getCellCenter(pair.positions[0]).y"
             :r="pair.isAdjacent ? 0.3 : 0.1"
-            :fill="pair.isAdjacent ? '#22c55e' : '#ef4444'"
+            :fill="pair.isAdjacent ? PAIR_VISUALIZATION_CONFIG.color.adjacent : PAIR_VISUALIZATION_CONFIG.color.nonAdjacent"
             :fill-opacity="getPairOpacity(pair)"
             style="transition: r 0.3s ease-in-out, fill 0.3s ease-in-out, fill-opacity 0.3s ease-in-out;"
           />
@@ -573,7 +445,7 @@ onUnmounted(() => {
             :cx="getCellCenter(pair.positions[1]).x"
             :cy="getCellCenter(pair.positions[1]).y"
             :r="pair.isAdjacent ? 0.3 : 0.1"
-            :fill="pair.isAdjacent ? '#22c55e' : '#ef4444'"
+            :fill="pair.isAdjacent ? PAIR_VISUALIZATION_CONFIG.color.adjacent : PAIR_VISUALIZATION_CONFIG.color.nonAdjacent"
             :fill-opacity="getPairOpacity(pair)"
             style="transition: r 0.3s ease-in-out, fill 0.3s ease-in-out, fill-opacity 0.3s ease-in-out;"
           />
@@ -590,7 +462,7 @@ onUnmounted(() => {
               :y1="getCellCenter(pair.positions[0]).y"
               :x2="getCellCenter(pair.positions[1]).x"
               :y2="getCellCenter(pair.positions[1]).y"
-              :stroke="pair.isAdjacent ? '#22c55e' : '#ef4444'"
+              :stroke="pair.isAdjacent ? PAIR_VISUALIZATION_CONFIG.color.adjacent : PAIR_VISUALIZATION_CONFIG.color.nonAdjacent"
               :stroke-width="(pair.isAdjacent ? 0.16 : 0.08)"
               stroke-linecap="round"
               :stroke-opacity="getPairOpacity(pair)"
@@ -601,7 +473,7 @@ onUnmounted(() => {
               :cx="getCellCenter(pair.positions[0]).x"
               :cy="getCellCenter(pair.positions[0]).y"
               :r="pair.isAdjacent ? 0.3 : 0.1"
-              :fill="pair.isAdjacent ? '#22c55e' : '#ef4444'"
+              :fill="pair.isAdjacent ? PAIR_VISUALIZATION_CONFIG.color.adjacent : PAIR_VISUALIZATION_CONFIG.color.nonAdjacent"
               :fill-opacity="getPairOpacity(pair)"
               style="transition: r 0.3s ease-in-out, fill 0.3s ease-in-out, fill-opacity 0.3s ease-in-out;"
             />
@@ -609,7 +481,7 @@ onUnmounted(() => {
               :cx="getCellCenter(pair.positions[1]).x"
               :cy="getCellCenter(pair.positions[1]).y"
               :r="pair.isAdjacent ? 0.3 : 0.1"
-              :fill="pair.isAdjacent ? '#22c55e' : '#ef4444'"
+              :fill="pair.isAdjacent ? PAIR_VISUALIZATION_CONFIG.color.adjacent : PAIR_VISUALIZATION_CONFIG.color.nonAdjacent"
               :fill-opacity="getPairOpacity(pair)"
               style="transition: r 0.3s ease-in-out, fill 0.3s ease-in-out, fill-opacity 0.3s ease-in-out;"
             />
@@ -623,7 +495,7 @@ onUnmounted(() => {
             :cx="getCellCenter(pairPoint.outsidePoint).x"
             :cy="getCellCenter(pairPoint.outsidePoint).y"
             :r="pairPoint.pair.isAdjacent ? 0.3 : 0.1"
-            :fill="pairPoint.pair.isAdjacent ? '#22c55e' : '#ef4444'"
+            :fill="pairPoint.pair.isAdjacent ? PAIR_VISUALIZATION_CONFIG.color.adjacent : PAIR_VISUALIZATION_CONFIG.color.nonAdjacent"
             :fill-opacity="pairPoint.currentOpacity"
           />
         </g>
@@ -638,7 +510,7 @@ onUnmounted(() => {
               :cx="getCellCenter(pairPoint.insidePoint).x"
               :cy="getCellCenter(pairPoint.insidePoint).y"
               :r="pairPoint.pair.isAdjacent ? 0.3 : 0.1"
-              :fill="pairPoint.pair.isAdjacent ? '#22c55e' : '#ef4444'"
+              :fill="pairPoint.pair.isAdjacent ? PAIR_VISUALIZATION_CONFIG.color.adjacent : PAIR_VISUALIZATION_CONFIG.color.nonAdjacent"
               :fill-opacity="pairPoint.currentOpacity"
             />
           </g>
@@ -651,49 +523,22 @@ onUnmounted(() => {
             :y1="getCellCenter(pairPoint.outsidePoint).y"
             :x2="getCellCenter(pairPoint.insidePointRotated).x"
             :y2="getCellCenter(pairPoint.insidePointRotated).y"
-            :stroke="pairPoint.pair.isAdjacent ? '#22c55e' : '#ef4444'"
+            :stroke="pairPoint.pair.isAdjacent ? PAIR_VISUALIZATION_CONFIG.color.adjacent : PAIR_VISUALIZATION_CONFIG.color.nonAdjacent"
             :stroke-width="(pairPoint.pair.isAdjacent ? 0.16 : 0.08)"
             stroke-linecap="round"
             :stroke-opacity="pairPoint.currentOpacity"
           />
         </g>
       </svg>
-      
-      <div
-        v-if="overlay"
-        class="absolute z-20 pointer-events-none grid border-2 border-red-500"
-        :style="{ ...overlayStyle, gridTemplateColumns: `repeat(${overlay.op.n}, minmax(2.5rem, 1fr))` }"
-      >
-        <template v-for="(row, oy) in overlay.cells" :key="`o-${oy}`">
-          <div
-            v-for="(cell, ox) in row"
-            :key="`o-${oy}-${ox}`"
-            class="cell relative aspect-square border border-gray-300 dark:border-neutral-700 text-center flex items-center justify-center font-bold"
-            :style="{ ...getBaseCellStyle(cell), fontSize: cellFontSize }"
-          >
-          </div>
-        </template>
-      </div>
-      <template v-for="(row, y) in fieldStore.field" :key="y">
-        <div
-          v-for="(cell, x) in row"
-          :key="`${y}-${x}`"
-          class="cell relative aspect-square border border-gray-300 dark:border-neutral-700
-            text-center flex items-center justify-center cursor-pointer font-bold transition-all duration-100 ease-in-out"
-          :data-x="x"
-          :data-y="y"
-          :class="getCellClass(x, y)"
-          :style="{ ...getCellStyleObject(cell, x, y), fontSize: cellFontSize }"
-        >
-          {{ cell }}
+      </template>
+      <template #cell-overlay="{ x, y }">
           <div
             v-if="isTopLeftCorner(x, y)"
             class="absolute border-2 border-green-500 pointer-events-none z-10"
             :style="selectionStyle"
           />
-        </div>
       </template>
-    </div>
+    </GameBoardGridBase>
   </div>
   <div class="flex items-center gap-2 mb-2">
     <label class="text-sm w-16">ズーム</label>

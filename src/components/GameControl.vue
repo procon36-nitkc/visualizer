@@ -1,57 +1,50 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useFieldStore } from "@/stores/field";
+import { useGameUiStore } from "@/stores/gameUi";
 import { isFieldComplete } from "@/utils/isFieldComplete";
-import type { Operation } from "@/types";
-
-const props = defineProps<{
-  selected: { x: number; y: number }[];
-  operations: Operation[];
-}>();
-
-const emit = defineEmits<{
-  (e: "update:selected", value: { x: number; y: number }[]): void;
-}>();
+import { storeToRefs } from "pinia";
+import { useSelectionGeometry } from "@/composables/useSelectionGeometry";
 
 const fieldStore = useFieldStore();
+const gameUiStore = useGameUiStore();
+const { selected, operations, pairMinDistance, pairMaxDistance } = storeToRefs(gameUiStore);
 const showExport = ref(false);
 const completeStatus = ref<boolean | null>(null); // ← 完成状態の保持
 const isPlaying = computed(() => fieldStore.isPlaying);
 const customStep = ref(10);
+const { hasSelection, topLeft, squareSize } = useSelectionGeometry(selected);
+const pairDistanceUpperBound = computed(() => Math.max(2, fieldStore.size * 2));
 
-const topLeft = computed(() => {
-  if (props.selected.length < 2) return { x: 0, y: 0 };
-  return {
-    x: Math.min(props.selected[0].x, props.selected[1].x),
-    y: Math.min(props.selected[0].y, props.selected[1].y),
-  };
-});
+const clampPairDistanceByBoardSize = () => {
+  if (pairMaxDistance.value > pairDistanceUpperBound.value) {
+    pairMaxDistance.value = pairDistanceUpperBound.value;
+  }
+  gameUiStore.clampPairDistanceRange();
+};
 
-const size = computed(() => {
-  if (props.selected.length < 2) return 0;
-  const [a, b] = props.selected;
-  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) + 1;
-});
+watch(pairDistanceUpperBound, clampPairDistanceByBoardSize, { immediate: true });
 
 const canRotate = computed(() => {
   if (import.meta.server) return false;
-  if (props.selected.length < 2) return false;
+  if (!hasSelection.value) return false;
+  if (!topLeft.value) return false;
   const { x, y } = topLeft.value;
   return (
-    size.value >= 2 &&
-    x + size.value <= fieldStore.size &&
-    y + size.value <= fieldStore.size
+    squareSize.value >= 2 &&
+    x + squareSize.value <= fieldStore.size &&
+    y + squareSize.value <= fieldStore.size
   );
 });
 
 const handleRotate = () => {
-  if (!canRotate.value) return;
-  fieldStore.rotate(topLeft.value.x, topLeft.value.y, size.value);
+  if (!canRotate.value || !topLeft.value) return;
+  fieldStore.rotate(topLeft.value.x, topLeft.value.y, squareSize.value);
 };
 
 const startPlayback = () => {
-  if (props.operations.length === 0) return;
-  fieldStore.startPlayback(props.operations);
+  if (operations.value.length === 0) return;
+  fieldStore.startPlayback(operations.value);
 };
 
 const stopPlayback = () => {
@@ -61,7 +54,7 @@ const stopPlayback = () => {
 const handleReset = () => {
   if (window.confirm('リセットしますか？')) {
     fieldStore.resetField();
-    emit('update:selected', []);
+    gameUiStore.clearSelected();
   }
 };
 
@@ -72,10 +65,14 @@ const handleCheckComplete = () => {
 const stepSeek = (delta: number) => {
   const target = Math.min(
     Math.max(fieldStore.playbackIndex + delta, 0),
-    props.operations.length
+    operations.value.length
   );
-  fieldStore.beginSeek(props.operations);
-  fieldStore.commitSeek(target, props.operations);
+  fieldStore.beginSeek(operations.value);
+  fieldStore.commitSeek(target, operations.value);
+};
+
+const handlePairDistanceInput = () => {
+  clampPairDistanceByBoardSize();
 };
 </script>
 
@@ -94,7 +91,7 @@ const stepSeek = (delta: number) => {
 
         <UButton
           @click="startPlayback"
-          :disabled="isPlaying || props.operations.length === 0"
+          :disabled="isPlaying || operations.length === 0"
           icon="i-heroicons-play"
           color="primary"
         >
@@ -111,19 +108,19 @@ const stepSeek = (delta: number) => {
         <input
           type="range"
           min="0"
-          :max="props.operations.length"
+          :max="operations.length"
           v-model.number="fieldStore.playbackIndex"
-          @mousedown="fieldStore.beginSeek(props.operations)"
-          @input="fieldStore.seekTo(fieldStore.playbackIndex, props.operations)"
-          @mouseup="fieldStore.commitSeek(fieldStore.playbackIndex, props.operations)"
-          @touchend="fieldStore.commitSeek(fieldStore.playbackIndex, props.operations)"
+          @mousedown="fieldStore.beginSeek(operations)"
+          @input="fieldStore.seekTo(fieldStore.playbackIndex, operations)"
+          @mouseup="fieldStore.commitSeek(fieldStore.playbackIndex, operations)"
+          @touchend="fieldStore.commitSeek(fieldStore.playbackIndex, operations)"
           :disabled="isPlaying"
           class="w-48"
         />
 
         <div class="flex items-center gap-1 ml-2">
           <span class="text-sm min-w-[10rem]"
-            >step: {{ fieldStore.playbackIndex }}/{{ props.operations.length }}</span
+            >step: {{ fieldStore.playbackIndex }}/{{ operations.length }}</span
           >
           <label class="text-sm ml-1">N</label>
           <UInput
@@ -200,6 +197,31 @@ const stepSeek = (delta: number) => {
           />
           <span class="text-sm w-12 text-right">{{ fieldStore.animationDuration }}ms</span>
         </div>
+
+        <div class="flex items-center gap-2 ml-2">
+          <label class="text-sm">距離Min</label>
+          <input
+            type="range"
+            min="1"
+            :max="Math.max(1, pairMaxDistance - 1)"
+            step="1"
+            v-model.number="pairMinDistance"
+            @input="handlePairDistanceInput"
+            class="w-24"
+          />
+          <span class="text-sm w-8 text-right">{{ pairMinDistance }}</span>
+          <label class="text-sm">距離Max</label>
+          <input
+            type="range"
+            :min="pairMinDistance + 1"
+            :max="pairDistanceUpperBound"
+            step="1"
+            v-model.number="pairMaxDistance"
+            @input="handlePairDistanceInput"
+            class="w-24"
+          />
+          <span class="text-sm w-8 text-right">{{ pairMaxDistance }}</span>
+        </div>
       </ClientOnly>
 
       <UButton
@@ -214,11 +236,11 @@ const stepSeek = (delta: number) => {
       </UButton>
 
       <span
-        v-if="props.selected.length === 2"
+        v-if="hasSelection && topLeft"
         class="text-sm text-gray-600 dark:text-gray-300"
       >
-        園: 左上 ({{ topLeft.x }}, {{ topLeft.y }}) / サイズ: {{ size }}x{{
-          size
+        園: 左上 ({{ topLeft.x }}, {{ topLeft.y }}) / サイズ: {{ squareSize }}x{{
+          squareSize
         }}
       </span>
     </div>

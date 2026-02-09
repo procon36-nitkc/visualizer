@@ -7,6 +7,11 @@ export interface Operation {
   n: number;
 }
 
+export interface Position {
+  x: number;
+  y: number;
+}
+
 export const isOperation = (operation: any): operation is Operation => {
   return (
     operation !== null &&
